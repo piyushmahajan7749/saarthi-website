@@ -66,7 +66,7 @@ export default function Home() {
       {/* NAV */}
       <nav>
         <div className="nav-logo">
-          <Image src="/logo-transparent.png" alt="Saarthi" width={48} height={48} style={{ objectFit: 'contain' }} />
+          <Image src="/logo-transparent.png" alt="Saarthi" width={72} height={72} style={{ objectFit: 'contain' }} />
           <div>
             <div className="nav-logo-text">Saar<span>thi</span></div>
             <div className="nav-logo-hi">सारथी</div>
@@ -446,7 +446,7 @@ export default function Home() {
       <footer>
         <div className="footer-inner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Image src="/logo-transparent.png" alt="Saarthi" width={44} height={44} style={{ objectFit: 'contain' }} />
+            <Image src="/logo-transparent.png" alt="Saarthi" width={64} height={64} style={{ objectFit: 'contain' }} />
             <div>
               <div className="footer-logo">Saar<span>thi</span> · सारथी</div>
               <div className="footer-tagline" style={{ marginTop: '6px' }}>Har saude mein saath.</div>
