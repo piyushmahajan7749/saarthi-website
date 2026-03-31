@@ -1,20 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-/* ── SVG Logo Component (placeholder-ready) ── */
-function ChakraLogo({ size = 28, color = '#C8601A' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-      <circle cx="32" cy="32" r="29" stroke={color} strokeWidth="1.5" />
-      <line x1="32" y1="5" x2="32" y2="59" stroke={color} strokeWidth="0.8" opacity="0.4" />
-      <line x1="5" y1="32" x2="59" y2="32" stroke={color} strokeWidth="0.8" opacity="0.4" />
-      <line x1="11" y1="11" x2="53" y2="53" stroke={color} strokeWidth="0.8" opacity="0.4" />
-      <line x1="53" y1="11" x2="11" y2="53" stroke={color} strokeWidth="0.8" opacity="0.4" />
-      <circle cx="32" cy="32" r="3.5" fill={color} />
-      <path d="M32 8 L29 15 L32 13 L35 15 Z" fill={color} />
-    </svg>
-  )
-}
+import Image from 'next/image'
 
 function PhoneIcon({ size = 16 }: { size?: number }) {
   return (
@@ -79,9 +66,7 @@ export default function Home() {
       {/* NAV */}
       <nav>
         <div className="nav-logo">
-          {/* PLACEHOLDER: Replace with actual logo image */}
-          {/* <img src="/logo.png" alt="Saarthi" width={28} height={28} /> */}
-          <ChakraLogo size={28} />
+          <Image src="/logo-transparent.png" alt="Saarthi" width={48} height={48} style={{ objectFit: 'contain' }} />
           <div>
             <div className="nav-logo-text">Saar<span>thi</span></div>
             <div className="nav-logo-hi">सारथी</div>
@@ -460,9 +445,12 @@ export default function Home() {
       {/* FOOTER */}
       <footer>
         <div className="footer-inner">
-          <div>
-            <div className="footer-logo">Saar<span>thi</span> · सारथी</div>
-            <div className="footer-tagline" style={{ marginTop: '6px' }}>Har saude mein saath.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Image src="/logo-transparent.png" alt="Saarthi" width={44} height={44} style={{ objectFit: 'contain' }} />
+            <div>
+              <div className="footer-logo">Saar<span>thi</span> · सारथी</div>
+              <div className="footer-tagline" style={{ marginTop: '6px' }}>Har saude mein saath.</div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap' as const }}>
             <a href="#what" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>What it is</a>
