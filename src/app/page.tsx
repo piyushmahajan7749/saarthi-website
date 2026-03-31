@@ -432,7 +432,7 @@ export default function Home() {
           <h2 className="cta-title reveal">Talash se ghar tak —<br /><em>Saarthi.</em></h2>
           <p className="cta-sub reveal reveal-delay-1">Whether you&apos;re searching for a home or closing more deals — one WhatsApp message is all it takes to get started.</p>
           <div className="cta-actions reveal reveal-delay-2">
-            <a href="https://wa.me/91XXXXXXXXXX" className="btn-primary" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }}>
+            <a href="https://wa.me/919826078459" className="btn-primary" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }}>
               <PhoneIcon size={18} />
               Start on WhatsApp
             </a>
@@ -475,7 +475,7 @@ export default function Home() {
       </footer>
 
       {/* WhatsApp float */}
-      <a href="https://wa.me/91XXXXXXXXXX" className="wa-float">
+      <a href="https://wa.me/919826078459" className="wa-float">
         <div className="wa-float-dot"></div>
         WhatsApp us
       </a>
