@@ -457,6 +457,9 @@ export default function Home() {
             <a href="#how" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>How it works</a>
             <a href="#brokers" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>For brokers</a>
             <a href="#cities" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Cities</a>
+            <a href="/privacy-policy" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="/terms" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="/data-deletion" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Data Deletion</a>
           </div>
           <div className="footer-meta">© 2025 Saarthi AI · Indore, India</div>
         </div>
