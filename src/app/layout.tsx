@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './platform.css'
 
 export const metadata: Metadata = {
   title: 'Saarthi — Har saude mein saath.',
-  description: 'India\'s AI property guide. From the first message to the final keys — Saarthi is the intelligent guide that sits beside every broker and every buyer.',
+  description:
+    "India's AI property guide. Browse verified listings in Indore, chat with our AI assistant, and let Saarthi guide you from the first message to the final keys.",
   icons: {
     icon: '/favicon.svg',
   },

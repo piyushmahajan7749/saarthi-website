@@ -1,7 +1,16 @@
-'use client'
+import Link from 'next/link'
+import type { Property } from '@prisma/client'
+import { db } from '@/lib/db'
+import Nav from '@/components/Nav'
+import Footer from '@/components/Footer'
+import WhatsAppFloat from '@/components/WhatsAppFloat'
+import ChatWidget from '@/components/ChatWidget'
+import PropertyCard from '@/components/PropertyCard'
+import { ScrollReveal, HeroSearch } from './HomeClient'
 
-import { useEffect } from 'react'
-import Image from 'next/image'
+export const dynamic = 'force-dynamic'
+
+const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
 
 function PhoneIcon({ size = 16 }: { size?: number }) {
   return (
@@ -19,67 +28,32 @@ function CheckIcon() {
   )
 }
 
-export default function Home() {
-  useEffect(() => {
-    // Scroll reveal
-    const reveals = document.querySelectorAll('.reveal')
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible')
-            obs.unobserve(e.target)
-          }
-        })
-      },
-      { threshold: 0.12 }
-    )
-    reveals.forEach((r) => obs.observe(r))
+const marqueeItems = [
+  { highlight: 'Indore', text: 'MagicBricks verified' },
+  { highlight: '2BHK ready to move', text: 'Found in 11 minutes' },
+  { highlight: 'RERA clean developer', text: '22 min commute' },
+  { highlight: 'Fair price', text: '₹1.5L negotiated off asking' },
+  { highlight: 'Deal closed', text: '9 days from first message' },
+  { highlight: 'Pune', text: 'No broker fee' },
+  { highlight: 'Bhopal', text: '5,800+ live listings scanned' },
+]
 
-    // Nav scroll effect
-    const handleScroll = () => {
-      const nav = document.querySelector('nav')
-      if (nav) {
-        nav.style.background = window.scrollY > 80 ? 'rgba(14,10,6,0.92)' : 'rgba(14,10,6,0.7)'
-      }
-    }
-    window.addEventListener('scroll', handleScroll)
-
-    return () => {
-      obs.disconnect()
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [])
-
-  const marqueeItems = [
-    { highlight: 'Indore', text: 'MagicBricks verified' },
-    { highlight: '2BHK ready to move', text: 'Found in 11 minutes' },
-    { highlight: 'RERA clean developer', text: '22 min commute' },
-    { highlight: 'Fair price', text: '₹1.5L negotiated off asking' },
-    { highlight: 'Deal closed', text: '9 days from first message' },
-    { highlight: 'Pune', text: 'No broker fee' },
-    { highlight: 'Bhopal', text: '5,800+ live listings scanned' },
-  ]
+export default async function Home() {
+  let featured: Property[] = []
+  try {
+    featured = await db.property.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
+      take: 6,
+    })
+  } catch (err) {
+    console.error('[home] failed to load featured listings:', err)
+  }
 
   return (
     <>
-      {/* NAV */}
-      <nav>
-        <div className="nav-logo">
-          <Image src="/logo-transparent.png" alt="Saarthi" width={72} height={72} style={{ objectFit: 'contain' }} />
-          <div>
-            <div className="nav-logo-text">Saar<span>thi</span></div>
-            <div className="nav-logo-hi">सारथी</div>
-          </div>
-        </div>
-        <div className="nav-links">
-          <a href="#what">What it is</a>
-          <a href="#how">How it works</a>
-          <a href="#brokers">For brokers</a>
-          <a href="#cities">Cities</a>
-        </div>
-        <a href="#cta" className="nav-cta">WhatsApp us →</a>
-      </nav>
+      <ScrollReveal />
+      <Nav />
 
       {/* HERO */}
       <section className="hero">
@@ -90,13 +64,16 @@ export default function Home() {
         <div className="hero-title-hi">हर सौदे में साथ।</div>
         <p className="hero-sub">From the first message to the final keys — <strong>Saarthi is the intelligent guide</strong> that sits beside every broker and every buyer, making India&apos;s real estate market finally work in your favour.</p>
         <div className="hero-actions">
-          <a href="#cta" className="btn-primary">
+          <a href={`https://wa.me/${WA}`} className="btn-primary" target="_blank" rel="noopener noreferrer">
             <PhoneIcon size={16} />
             WhatsApp us now
           </a>
           <a href="#how" className="btn-ghost">See how it works ↓</a>
         </div>
-        <div className="hero-stats">
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '640px', margin: '2.75rem auto 0', animation: 'fadeUp 0.8s 0.5s ease both' }}>
+          <HeroSearch />
+        </div>
+        <div className="hero-stats" style={{ marginTop: '3.5rem' }}>
           <div className="stat-item">
             <div className="stat-num">9 days</div>
             <div className="stat-label">Average time to close a deal</div>
@@ -129,6 +106,35 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* FEATURED LISTINGS */}
+      <section id="featured" style={{ background: 'var(--ink)', paddingTop: '5.5rem', paddingBottom: '5.5rem' }}>
+        <div className="container" style={{ maxWidth: '1200px' }}>
+          <div className="spread" style={{ alignItems: 'flex-end', marginBottom: '2.5rem' }}>
+            <div>
+              <p className="section-eyebrow reveal">Live inventory</p>
+              <h2 className="section-title reveal reveal-delay-1" style={{ marginBottom: 0 }}>Fresh on the <em>market</em></h2>
+            </div>
+            <Link href="/listings" className="btn btn-outline reveal reveal-delay-2">View all listings →</Link>
+          </div>
+          {featured.length > 0 ? (
+            <div className="listings-grid reveal reveal-delay-1">
+              {featured.map((p) => (
+                <PropertyCard key={p.id} property={p} />
+              ))}
+            </div>
+          ) : (
+            <div className="empty reveal">
+              <div className="empty-icon">🏗️</div>
+              <p style={{ fontSize: '16px', color: 'var(--cream)', marginBottom: '0.5rem' }}>New listings drop daily</p>
+              <p className="hint" style={{ marginBottom: '1.5rem' }}>Inventory is being curated right now — Saarthi ko bataiye kya chahiye, hum dhoondh denge.</p>
+              <a href={`https://wa.me/${WA}?text=${encodeURIComponent("Hi Saarthi! I'm looking for a property in Indore.")}`} className="btn btn-solid" target="_blank" rel="noopener noreferrer">
+                Tell Saarthi on WhatsApp
+              </a>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* WHAT IS SAARTHI */}
       <section className="what-section" id="what">
@@ -391,14 +397,10 @@ export default function Home() {
           </div>
           <div className="tech-grid">
             {[
-              { badge: 'Data', name: 'Firecrawl', desc: 'Scrapes every major portal every 6 hours. 1,200+ live listings always fresh.' },
-              { badge: 'Intelligence', name: 'Advanced RAG', desc: 'Retrieval-augmented generation that matches client profiles to live market data with precision.' },
-              { badge: 'Messaging', name: 'OpenClaw + WhatsApp', desc: "Agent-orchestration framework running natively on the broker's WhatsApp Business number." },
               { badge: 'AI', name: 'Claude (Anthropic)', desc: 'The most capable and safety-conscious AI model powering every conversation and report.' },
-              { badge: 'Memory', name: 'pgvector + Postgres', desc: 'Every client, every deal, every conversation — stored and searchable in a vector database that never forgets.' },
-              { badge: 'Automation', name: 'Cron jobs', desc: 'Price alerts, listing freshness, deal monitoring, weekly reports — all automated and running 24/7.' },
-              { badge: 'Learning', name: 'Autoresearch loop', desc: "Inspired by Karpathy's research framework — Saarthi analyses its own performance every night and updates its strategy." },
-              { badge: 'Infrastructure', name: 'Azure VM', desc: 'Multi-tenant architecture on Azure. One platform, any number of broker instances across any city.' },
+              { badge: 'Intelligence', name: 'Advanced RAG', desc: 'Retrieval-augmented generation that matches client profiles to live market data with precision.' },
+              { badge: 'Messaging', name: 'WhatsApp native', desc: "Agent orchestration running directly on the broker's WhatsApp Business number — zero new apps." },
+              { badge: 'Automation', name: 'Always-on monitoring', desc: 'Price alerts, listing freshness, deal monitoring, weekly reports — automated and running 24/7.' },
             ].map((tech, i) => (
               <div className={`tech-card reveal ${i % 4 > 0 ? `reveal-delay-${i % 4}` : ''}`} key={i}>
                 <div className="tech-badge">{tech.badge}</div>
@@ -417,11 +419,11 @@ export default function Home() {
           <h2 className="cta-title reveal">Talash se ghar tak —<br /><em>Saarthi.</em></h2>
           <p className="cta-sub reveal reveal-delay-1">Whether you&apos;re searching for a home or closing more deals — one WhatsApp message is all it takes to get started.</p>
           <div className="cta-actions reveal reveal-delay-2">
-            <a href="https://wa.me/919826078459" className="btn-primary" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }}>
+            <a href={`https://wa.me/${WA}`} className="btn-primary" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }} target="_blank" rel="noopener noreferrer">
               <PhoneIcon size={18} />
               Start on WhatsApp
             </a>
-            <a href="mailto:hello@saarthi.ai" className="btn-ghost" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }}>Email us</a>
+            <Link href="/listings" className="btn-ghost" style={{ fontSize: '17px', padding: '1.1rem 2.5rem' }}>Browse listings</Link>
           </div>
           <p className="cta-note reveal reveal-delay-3">Free for property seekers · No brokerage charges · Available in Indore now</p>
           <div style={{ marginTop: '3rem', paddingTop: '3rem', borderTop: '1px solid rgba(200,96,26,0.12)', display: 'flex', justifyContent: 'center', gap: '4rem', flexWrap: 'wrap' as const }} className="reveal reveal-delay-4">
@@ -442,34 +444,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer>
-        <div className="footer-inner">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Image src="/logo-transparent.png" alt="Saarthi" width={64} height={64} style={{ objectFit: 'contain' }} />
-            <div>
-              <div className="footer-logo">Saar<span>thi</span> · सारथी</div>
-              <div className="footer-tagline" style={{ marginTop: '6px' }}>Har saude mein saath.</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap' as const }}>
-            <a href="#what" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>What it is</a>
-            <a href="#how" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>How it works</a>
-            <a href="#brokers" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>For brokers</a>
-            <a href="#cities" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Cities</a>
-            <a href="/privacy-policy" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/terms" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/data-deletion" style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}>Data Deletion</a>
-          </div>
-          <div className="footer-meta">© 2025 Saarthi AI · Indore, India</div>
-        </div>
-      </footer>
-
-      {/* WhatsApp float */}
-      <a href="https://wa.me/919826078459" className="wa-float">
-        <div className="wa-float-dot"></div>
-        WhatsApp us
-      </a>
+      <Footer />
+      <WhatsAppFloat text="Hi Saarthi! I'm looking for a property in Indore." />
+      <ChatWidget />
     </>
   )
 }

@@ -1,0 +1,158 @@
+// Saarthi platform schema.
+// SQLite for local dev — swap provider/url to Postgres in production.
+// Enums are modeled as String fields (SQLite has no enums); valid values are
+// documented per field and enforced in src/types.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Admins and brokers who manage listings and receive lead notifications.
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String     @unique // E.164-ish, e.g. "919826078459"
+  email        String?    @unique
+  passwordHash String?
+  role         String     @default("BROKER") // ADMIN | BROKER
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  properties   Property[] @relation("PostedBy")
+  leads        Lead[]     @relation("AssignedTo")
+  activities   Activity[]
+}
+
+model Property {
+  id          String  @id @default(cuid())
+  title       String
+  description String  @default("")
+  type        String  @default("FLAT") // FLAT | HOUSE | VILLA | PLOT | COMMERCIAL | OFFICE | SHOP | PG
+  listingFor  String  @default("SALE") // SALE | RENT
+  bhk         Int? // bedrooms; null for plot/commercial
+  price       Float? // absolute rupees (e.g. 7500000); rent is per month
+  area        Float?
+  areaUnit    String  @default("sqft") // sqft | sqyd | acre
+  furnishing  String? // UNFURNISHED | SEMI_FURNISHED | FURNISHED
+  floor       String? // "3rd of 8"
+  facing      String?
+  ageYears    Int?
+  locality    String  @default("")
+  city        String  @default("Indore")
+  address     String  @default("")
+  amenities   String  @default("[]") // JSON string[]
+  images      String  @default("[]") // JSON string[] of urls/paths
+
+  // ---- tracking / pipeline ----
+  status       String  @default("DRAFT") // DRAFT | PENDING_REVIEW | ACTIVE | SOLD | RENTED | ARCHIVED
+  source       String  @default("MANUAL") // WHATSAPP | EXCEL | WEBFORM | MANUAL
+  featured     Boolean @default(false)
+  views        Int     @default(0)
+  ownerName    String?
+  ownerPhone   String?
+  rawText      String? // original unparsed text (whatsapp msg / excel row / form blob)
+  aiSummary    String? // one-line AI sales pitch
+  aiNotes      String? // AI comments: missing fields, red flags, pricing opinion
+  aiConfidence Float? // 0..1 parse confidence
+  adminNotes   String? // human notes
+
+  postedById String?
+  postedBy   User?   @relation("PostedBy", fields: [postedById], references: [id])
+
+  intakeBatchId String?
+  intakeBatch   IntakeBatch? @relation(fields: [intakeBatchId], references: [id])
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  matches    LeadMatch[]
+  activities Activity[]
+
+  @@index([status, listingFor, type])
+  @@index([locality])
+}
+
+// A buyer/renter talking to the bot (WhatsApp or website chat).
+model Lead {
+  id     String  @id @default(cuid())
+  name   String?
+  phone  String  @unique // wa id / phone; website leads get "web:<session>" until phone captured
+  source String  @default("WHATSAPP") // WHATSAPP | WEBSITE | MANUAL
+
+  // ---- qualification ----
+  status       String  @default("NEW") // NEW | QUALIFYING | WARM | COLD | VISIT_SCHEDULED | CLOSED | LOST
+  requirements String  @default("{}") // JSON LeadRequirements (budgetMin/Max, bhk, type, listingFor, localities[], timeline, notes)
+  aiSummary    String? // AI's running summary of who this lead is
+  score        Int     @default(0) // 0..100 qualification score
+  brokerNotified Boolean @default(false) // warm-lead alert sent to broker
+
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  messages   Message[]
+  matches    LeadMatch[]
+  activities Activity[]
+
+  @@index([status])
+}
+
+// Full conversation transcript per lead (bot + human).
+model Message {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  direction String // INBOUND | OUTBOUND
+  channel   String   @default("WHATSAPP") // WHATSAPP | WEBCHAT | SYSTEM
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+// Properties the bot matched & sent to a lead, with score.
+model LeadMatch {
+  id         String   @id @default(cuid())
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  score      Float    @default(0)
+  sentAt     DateTime @default(now())
+
+  @@unique([leadId, propertyId])
+}
+
+// CRM audit trail: status changes, notifications, intake events, visits.
+model Activity {
+  id         String    @id @default(cuid())
+  type       String // LEAD_CREATED | STATUS_CHANGE | BROKER_NOTIFIED | MATCHES_SENT | NOTE | VISIT_SCHEDULED | LISTING_CREATED | LISTING_PUBLISHED | INTAKE
+  description String
+  leadId     String?
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+  createdAt  DateTime  @default(now())
+
+  @@index([leadId])
+  @@index([propertyId])
+}
+
+// One parse run (pasted WhatsApp chat, uploaded Excel, or web form submission).
+model IntakeBatch {
+  id         String     @id @default(cuid())
+  source     String // WHATSAPP | EXCEL | WEBFORM
+  rawContent String     @default("") // original pasted text / file name / form json
+  status     String     @default("PARSED") // PARSED | COMMITTED | DISCARDED
+  itemCount  Int        @default(0)
+  createdBy  String? // user id (admin) or null for public web form
+  createdAt  DateTime   @default(now())
+  properties Property[]
+}
