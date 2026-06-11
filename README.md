@@ -8,10 +8,16 @@ A full-stack real-estate platform: public listings site with AI smart search and
 
 ```bash
 npm install
-npm run db:push      # create SQLite db from prisma/schema.prisma
+# Set DATABASE_URL + DIRECT_URL in .env.local to your Postgres (see Database below)
+npm run db:push      # create tables in Postgres from prisma/schema.prisma
 npm run db:seed      # admin user + brokers + 14 Indore listings + sample leads
 npm run dev          # http://localhost:3000
 ```
+
+> **Database:** Postgres (local and prod share one — SQLite can't run on Vercel).
+> On Vercel: Storage → Create Database → Postgres auto-injects `DATABASE_URL`; add
+> `DIRECT_URL` = the non-pooling URL. Pull the same values locally with
+> `vercel env pull .env.local`, or paste the connection string into `.env.local`.
 
 **Admin login** → `http://localhost:3000/admin/login`
 - Phone: `919826078459` · Password: `saarthi123` (change via `SEED_ADMIN_PHONE` / `SEED_ADMIN_PASSWORD` in `.env` before seeding)
@@ -58,6 +64,7 @@ Put real secrets in `.env.local` (gitignored); `.env` holds safe defaults.
 
 ## Going to production
 
-- Swap `datasource db` in `prisma/schema.prisma` to `postgresql` and set `DATABASE_URL` — the schema is Postgres-ready (string enums, no SQLite-isms).
+- **Database (required for Vercel):** create a Vercel Postgres (Storage tab) — it sets `DATABASE_URL` automatically. Add `DIRECT_URL` (= `POSTGRES_URL_NON_POOLING`). Run `npm run db:push && npm run db:seed` once against it (locally with the same URL in `.env.local`, or via `vercel env pull`). SQLite (`file:`) does **not** work on Vercel's read-only serverless filesystem.
 - Point the Meta webhook at `https://<domain>/api/webhooks/whatsapp` with your `WHATSAPP_VERIFY_TOKEN`.
 - Set a strong `SESSION_SECRET`, real `ANTHROPIC_API_KEY`, and `NEXT_PUBLIC_SITE_URL`.
+- Uploaded media (`/api/admin/upload`) writes to `public/uploads`, which is ephemeral on Vercel — switch to S3 / Vercel Blob for production (the app only stores the URL).

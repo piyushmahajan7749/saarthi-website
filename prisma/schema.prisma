@@ -1,15 +1,19 @@
 // Saarthi platform schema.
-// SQLite for local dev — swap provider/url to Postgres in production.
-// Enums are modeled as String fields (SQLite has no enums); valid values are
-// documented per field and enforced in src/types.ts.
+// PostgreSQL (works on Vercel; SQLite cannot run on serverless). Local dev and
+// production share a hosted Postgres via DATABASE_URL.
+// Enums are modeled as String fields; valid values are documented per field and
+// enforced in src/types.ts.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Direct (non-pooling) URL for migrations / db push. On Vercel Postgres this
+  // is POSTGRES_URL_NON_POOLING; locally set it to the same value as DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 // Admins and brokers who manage listings and receive lead notifications.
