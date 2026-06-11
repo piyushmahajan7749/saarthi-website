@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import PropertyForm, { emptyValues, type BrokerOpt } from '@/components/admin/PropertyForm'
+import PropertyForm from '@/components/admin/PropertyForm'
+import { emptyValues, type BrokerOpt } from '@/components/admin/property-form-shared'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'New listing — Saarthi Command Center' }

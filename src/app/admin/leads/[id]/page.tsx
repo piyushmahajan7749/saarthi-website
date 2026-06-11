@@ -21,10 +21,19 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
       messages: { orderBy: { createdAt: 'asc' } },
       matches: { include: { property: true }, orderBy: { sentAt: 'desc' } },
       activities: { orderBy: { createdAt: 'desc' } },
+      visits: { orderBy: { createdAt: 'desc' } },
       assignedTo: true,
+      createdBy: true,
     },
   })
   if (!lead) notFound()
+
+  // Resolve the properties referenced by each visit for display.
+  const visitPropIds = Array.from(new Set(lead.visits.flatMap((v) => safeJsonParse<string[]>(v.propertyIds, []))))
+  const visitProps = visitPropIds.length
+    ? await db.property.findMany({ where: { id: { in: visitPropIds } }, select: { id: true, title: true } })
+    : []
+  const propTitle = new Map(visitProps.map((p) => [p.id, p.title]))
 
   const users = await db.user.findMany({
     where: { active: true },
@@ -112,11 +121,23 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
             source: lead.source,
             brokerNotified: lead.brokerNotified,
             assignedToId: lead.assignedToId,
+            createdByName: lead.createdBy?.name ?? null,
+            conversationStarted: lead.conversationStarted,
             aiSummary: lead.aiSummary,
             createdAt: lead.createdAt.toISOString(),
             requirements,
           }}
           users={users}
+          visits={lead.visits.map((v) => ({
+            id: v.id,
+            status: v.status,
+            scheduledFor: v.scheduledFor ? v.scheduledFor.toISOString() : null,
+            availabilityText: v.availabilityText,
+            feedback: v.feedback,
+            notes: v.notes,
+            coordinatorNotified: v.coordinatorNotified,
+            propertyTitles: safeJsonParse<string[]>(v.propertyIds, []).map((id) => propTitle.get(id) ?? 'Property'),
+          }))}
           matches={lead.matches.map((m) => ({
             id: m.id,
             propertyId: m.propertyId,

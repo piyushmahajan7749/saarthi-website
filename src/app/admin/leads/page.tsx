@@ -3,12 +3,14 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatPhone, formatPrice, safeJsonParse, statusLabel, timeAgo } from '@/lib/format'
 import type { LeadRequirements } from '@/types'
+import AutomationsButton from './AutomationsButton'
 
 export const dynamic = 'force-dynamic'
 
 const PIPE_COLUMNS: { status: string; title: string }[] = [
   { status: 'NEW', title: 'New' },
   { status: 'QUALIFYING', title: 'Qualifying' },
+  { status: 'MATCHED', title: 'Matched' },
   { status: 'WARM', title: 'Warm 🔥' },
   { status: 'VISIT_SCHEDULED', title: 'Visit scheduled' },
   { status: 'CLOSED', title: 'Closed' },
@@ -69,20 +71,20 @@ export default async function LeadsPage() {
             {leads.length} total · {warmCount} warm 🔥 · brokers only get pinged when a lead turns warm
           </p>
         </div>
-        <Link href="/admin/simulator" className="btn btn-outline btn-sm">
-          🤖 Test the bot →
-        </Link>
+        <div className="row" style={{ gap: 8 }}>
+          <AutomationsButton />
+          <Link href="/admin/simulator" className="btn btn-quiet btn-sm">🤖 Test the bot</Link>
+          <Link href="/admin/leads/new" className="btn btn-solid btn-sm">+ Add lead</Link>
+        </div>
       </div>
 
       {leads.length === 0 ? (
         <div className="empty">
           <div className="empty-icon">💬</div>
-          <p style={{ maxWidth: 420, margin: '0 auto', lineHeight: 1.7 }}>
-            No leads yet — they&apos;ll appear the moment someone messages your WhatsApp bot.{' '}
-            <Link href="/admin/simulator" style={{ color: 'var(--o3)' }}>
-              Try the Simulator →
-            </Link>
+          <p style={{ maxWidth: 440, margin: '0 auto 1rem', lineHeight: 1.7 }}>
+            No leads yet — <Link href="/admin/leads/new" style={{ color: 'var(--o3)' }}>add one by voice or text</Link>, or they&apos;ll appear the moment someone messages your WhatsApp bot.
           </p>
+          <Link href="/admin/leads/new" className="btn btn-solid btn-sm">+ Add lead</Link>
         </div>
       ) : (
         <>

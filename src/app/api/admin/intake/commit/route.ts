@@ -29,10 +29,22 @@ export async function POST(req: Request) {
   const source = batch.source === 'EXCEL' ? 'EXCEL' : 'WHATSAPP'
   const ids: string[] = []
 
+  // Map WhatsApp group sender names -> existing broker Users (case-insensitive),
+  // so a listing posted by "Rajan Verma" is credited to that broker if registered.
+  const senderNames = Array.from(new Set(listings.map((l) => l.postedByName?.trim()).filter(Boolean) as string[]))
+  const allUsers = senderNames.length ? await db.user.findMany({ where: { active: true } }) : []
+  const byName = new Map(allUsers.map((u) => [u.name.toLowerCase(), u.id]))
+
   try {
     for (const l of listings) {
       const type = PROPERTY_TYPES.includes(l.type as never) ? l.type : 'FLAT'
       const listingFor = LISTING_FOR.includes(l.listingFor as never) ? l.listingFor : 'SALE'
+      const senderName = l.postedByName?.trim() || null
+      const matchedUserId = senderName ? byName.get(senderName.toLowerCase()) ?? null : null
+      // Media URLs the admin attached in the review step (optional).
+      const lx = l as typeof l & { images?: unknown; videos?: unknown }
+      const images = Array.isArray(lx.images) ? lx.images.filter((u) => typeof u === 'string') : []
+      const videos = Array.isArray(lx.videos) ? lx.videos.filter((u) => typeof u === 'string') : []
       const created = await db.property.create({
         data: {
           title: (l.title || 'Untitled listing').trim(),
@@ -48,16 +60,19 @@ export async function POST(req: Request) {
           city: l.city || 'Indore',
           address: l.address ?? '',
           amenities: JSON.stringify(Array.isArray(l.amenities) ? l.amenities : []),
-          images: '[]',
+          images: JSON.stringify(images),
+          videos: JSON.stringify(videos),
           status,
           source,
           ownerName: l.ownerName ?? null,
           ownerPhone: l.ownerPhone ? String(l.ownerPhone).replace(/\D/g, '') || null : null,
+          postedByName: senderName,
           rawText: l.rawText ?? null,
           aiSummary: l.aiSummary ?? null,
           aiNotes: l.aiNotes ?? null,
           aiConfidence: l.aiConfidence ?? null,
-          postedById: postedById || session?.id || null,
+          // Credit the matched broker; else the "Post as" selection / current user.
+          postedById: matchedUserId || postedById || session?.id || null,
           intakeBatchId: batch.id,
         },
       })

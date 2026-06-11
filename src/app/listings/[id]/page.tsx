@@ -35,6 +35,7 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
   db.property.update({ where: { id: property.id }, data: { views: { increment: 1 } } }).catch(() => {})
 
   const images = safeJsonParse<string[]>(property.images, [])
+  const videos = safeJsonParse<string[]>(property.videos, [])
   const amenities = safeJsonParse<string[]>(property.amenities, [])
   const isLive = property.status === 'ACTIVE'
 
@@ -94,7 +95,7 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
                 📍 {[property.locality, property.address, property.city].filter(Boolean).join(', ')}
               </p>
               <p className="hint" style={{ marginTop: 6 }}>
-                Listed {timeAgo(property.createdAt)} · {property.views} views · <span className="badge badge-gray">{property.source}</span>
+                Listed {timeAgo(property.createdAt)} · {property.views} views{property.postedByName ? ` · by ${property.postedByName}` : ''} · <span className="badge badge-gray">{property.source}</span>
               </p>
 
               <div className="card" style={{ marginTop: '1.5rem' }}>
@@ -122,6 +123,18 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
                   <h2 className="section-eyebrow" style={{ color: 'var(--o)' }}>Amenities</h2>
                   <div className="chips" style={{ marginTop: 10 }}>
                     {amenities.map((a) => <span key={a} className="chip" style={{ cursor: 'default' }}>{a}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {videos.length > 0 && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <h2 className="section-eyebrow" style={{ color: 'var(--o)' }}>Video walkthrough</h2>
+                  <div style={{ display: 'grid', gridTemplateColumns: videos.length > 1 ? '1fr 1fr' : '1fr', gap: 12, marginTop: 10 }}>
+                    {videos.map((src) => (
+                      // eslint-disable-next-line jsx-a11y/media-has-caption
+                      <video key={src} src={src} controls preload="metadata" style={{ width: '100%', borderRadius: 14, background: '#000', aspectRatio: '16/10' }} />
+                    ))}
                   </div>
                 </div>
               )}

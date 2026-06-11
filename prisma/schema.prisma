@@ -25,6 +25,8 @@ model User {
   updatedAt    DateTime   @updatedAt
   properties   Property[] @relation("PostedBy")
   leads        Lead[]     @relation("AssignedTo")
+  createdLeads Lead[]     @relation("CreatedLeads")
+  visits       Visit[]    @relation("VisitCoordinator")
   activities   Activity[]
 }
 
@@ -46,7 +48,8 @@ model Property {
   city        String  @default("Indore")
   address     String  @default("")
   amenities   String  @default("[]") // JSON string[]
-  images      String  @default("[]") // JSON string[] of urls/paths
+  images      String  @default("[]") // JSON string[] of photo urls/paths
+  videos      String  @default("[]") // JSON string[] of video urls/paths
 
   // ---- tracking / pipeline ----
   status       String  @default("DRAFT") // DRAFT | PENDING_REVIEW | ACTIVE | SOLD | RENTED | ARCHIVED
@@ -55,6 +58,7 @@ model Property {
   views        Int     @default(0)
   ownerName    String?
   ownerPhone   String?
+  postedByName String? // raw sender name from a WhatsApp group export when no User match
   rawText      String? // original unparsed text (whatsapp msg / excel row / form blob)
   aiSummary    String? // one-line AI sales pitch
   aiNotes      String? // AI comments: missing fields, red flags, pricing opinion
@@ -84,22 +88,54 @@ model Lead {
   source String  @default("WHATSAPP") // WHATSAPP | WEBSITE | MANUAL
 
   // ---- qualification ----
-  status       String  @default("NEW") // NEW | QUALIFYING | WARM | COLD | VISIT_SCHEDULED | CLOSED | LOST
+  status       String  @default("NEW") // NEW | QUALIFYING | MATCHED | WARM | COLD | VISIT_SCHEDULED | CLOSED | LOST
   requirements String  @default("{}") // JSON LeadRequirements (budgetMin/Max, bhk, type, listingFor, localities[], timeline, notes)
   aiSummary    String? // AI's running summary of who this lead is
   score        Int     @default(0) // 0..100 qualification score
   brokerNotified Boolean @default(false) // warm-lead alert sent to broker
+  conversationStarted Boolean @default(false) // outbound qualification kicked off
 
+  // The buyer's contact + how they entered the funnel.
   assignedToId String?
   assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+  // Staff member who added this lead — coordinates the visit with brokers.
+  createdById  String?
+  createdBy    User?   @relation("CreatedLeads", fields: [createdById], references: [id])
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   messages   Message[]
   matches    LeadMatch[]
+  visits     Visit[]
   activities Activity[]
 
   @@index([status])
+}
+
+// A property visit the bot tentatively schedules, then hands to the lead's
+// creator to confirm directly with the listing brokers.
+model Visit {
+  id               String    @id @default(cuid())
+  leadId           String
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status           String    @default("PROPOSED") // PROPOSED | TENTATIVE | CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
+  propertyIds      String    @default("[]") // JSON string[] of properties the lead picked
+  availabilityText String? // raw availability the lead gave the bot
+  scheduledFor     DateTime? // tentative slot (never same-day as request)
+  proposedSlots    String    @default("[]") // JSON string[] of ISO datetimes offered
+  notes            String?
+  feedback         String? // post-visit feedback captured by the bot
+  reminderSentAt   DateTime?
+  followupSentAt   DateTime?
+  coordinatorId    String? // staff who coordinates this visit (= lead.createdBy)
+  coordinator      User?     @relation("VisitCoordinator", fields: [coordinatorId], references: [id])
+  coordinatorNotified Boolean @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([status])
+  @@index([scheduledFor])
 }
 
 // Full conversation transcript per lead (bot + human).
@@ -131,7 +167,7 @@ model LeadMatch {
 // CRM audit trail: status changes, notifications, intake events, visits.
 model Activity {
   id         String    @id @default(cuid())
-  type       String // LEAD_CREATED | STATUS_CHANGE | BROKER_NOTIFIED | MATCHES_SENT | NOTE | VISIT_SCHEDULED | LISTING_CREATED | LISTING_PUBLISHED | INTAKE
+  type       String // LEAD_CREATED | LEAD_INITIATED | STATUS_CHANGE | BROKER_NOTIFIED | MATCHES_SENT | NOTE | VISIT_PROPOSED | VISIT_SCHEDULED | VISIT_CONFIRMED | REMINDER_SENT | FOLLOWUP_SENT | FEEDBACK | LISTING_CREATED | LISTING_PUBLISHED | INTAKE
   description String
   leadId     String?
   lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)

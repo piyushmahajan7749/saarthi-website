@@ -16,6 +16,7 @@ export default async function EditListingPage({ params }: { params: { id: string
 
   const brokers: BrokerOpt[] = users.map((u) => ({ id: u.id, name: u.name, role: u.role }))
   const images = safeJsonParse<string[]>(property.images, [])
+  const videos = safeJsonParse<string[]>(property.videos, [])
   const amenities = safeJsonParse<string[]>(property.amenities, [])
 
   const initial: PropertyFormValues = {
@@ -36,6 +37,7 @@ export default async function EditListingPage({ params }: { params: { id: string
     address: property.address,
     amenities,
     images: images.join('\n'),
+    videos: videos.join('\n'),
     description: property.description,
     ownerName: property.ownerName ?? '',
     ownerPhone: property.ownerPhone ?? '',

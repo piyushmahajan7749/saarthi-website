@@ -47,6 +47,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (has('address')) data.address = String(body.address ?? '')
   if (has('amenities') && Array.isArray(body.amenities)) data.amenities = JSON.stringify(body.amenities)
   if (has('images') && Array.isArray(body.images)) data.images = JSON.stringify(body.images)
+  if (has('videos') && Array.isArray(body.videos)) data.videos = JSON.stringify(body.videos)
   if (has('featured')) data.featured = Boolean(body.featured)
   if (has('ownerName')) data.ownerName = body.ownerName ? String(body.ownerName) : null
   if (has('ownerPhone')) data.ownerPhone = body.ownerPhone ? String(body.ownerPhone).replace(/\D/g, '') || null : null

@@ -16,6 +16,7 @@ interface ApiResult {
   replies: string[]
   status: string
   brokerAlert: string | null
+  visitScheduled?: { slotText: string; propertyTitles: string[] } | null
 }
 
 function statusBadgeClass(status: string): string {
@@ -150,9 +151,20 @@ export default function SimulatorClient() {
           )}
         </div>
 
+        {last?.visitScheduled && (
+          <div className="card" style={{ borderColor: 'rgba(40,160,120,0.4)', background: 'rgba(40,160,120,0.06)' }}>
+            <span className="label" style={{ color: '#4DC8A8', display: 'block', marginBottom: 6 }}>📅 Tentative visit scheduled</span>
+            <div style={{ fontSize: 14, color: 'var(--cream)' }}>🕒 {last.visitScheduled.slotText}</div>
+            {last.visitScheduled.propertyTitles.length > 0 && (
+              <div className="hint" style={{ marginTop: 4 }}>🏠 {last.visitScheduled.propertyTitles.join(' · ')}</div>
+            )}
+            <div className="hint" style={{ marginTop: 6 }}>Never same-day — coordinator notified to confirm with the broker.</div>
+          </div>
+        )}
+
         {last?.brokerAlert && (
           <div className="card" style={{ borderColor: 'rgba(200,96,26,0.45)', background: 'rgba(200,96,26,0.06)' }}>
-            <span className="label" style={{ color: 'var(--o3)', display: 'block', marginBottom: 8 }}>🔥 Broker alert sent</span>
+            <span className="label" style={{ color: 'var(--o3)', display: 'block', marginBottom: 8 }}>🔥 Coordinator alert sent</span>
             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: "'Outfit', sans-serif", fontSize: 12.5, lineHeight: 1.6, color: 'var(--cream)', margin: 0 }}>
               {last.brokerAlert}
             </pre>

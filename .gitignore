@@ -36,3 +36,6 @@ next-env.d.ts
 # database
 prisma/dev.db
 prisma/dev.db-journal
+
+# uploaded listing media (local/self-host)
+/public/uploads

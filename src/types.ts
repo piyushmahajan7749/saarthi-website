@@ -13,8 +13,11 @@ export type PropertyStatus = (typeof PROPERTY_STATUSES)[number]
 export const PROPERTY_SOURCES = ['WHATSAPP', 'EXCEL', 'WEBFORM', 'MANUAL'] as const
 export type PropertySource = (typeof PROPERTY_SOURCES)[number]
 
-export const LEAD_STATUSES = ['NEW', 'QUALIFYING', 'WARM', 'COLD', 'VISIT_SCHEDULED', 'CLOSED', 'LOST'] as const
+export const LEAD_STATUSES = ['NEW', 'QUALIFYING', 'MATCHED', 'WARM', 'COLD', 'VISIT_SCHEDULED', 'CLOSED', 'LOST'] as const
 export type LeadStatus = (typeof LEAD_STATUSES)[number]
+
+export const VISIT_STATUSES = ['PROPOSED', 'TENTATIVE', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const
+export type VisitStatus = (typeof VISIT_STATUSES)[number]
 
 export const FURNISHING = ['UNFURNISHED', 'SEMI_FURNISHED', 'FURNISHED'] as const
 
@@ -34,11 +37,23 @@ export interface ParsedListing {
   amenities: string[]
   ownerName: string | null
   ownerPhone: string | null
+  postedByName: string | null // WhatsApp group sender who posted this listing
+  mediaCount: number // photos/videos referenced in the source message
   description: string
   aiSummary: string | null
   aiNotes: string | null // missing fields, red flags, price opinion
   aiConfidence: number // 0..1
   rawText: string
+}
+
+// What the AI extracts from an admin's voice/text note when adding a lead.
+export interface ExtractedLead {
+  name: string | null
+  phone: string | null // digits, country code if present
+  requirements: LeadRequirements
+  aiSummary: string
+  notes: string | null
+  confidence: number // 0..1
 }
 
 // What the qualifier bot extracts from a lead conversation.
@@ -82,6 +97,12 @@ export interface QualifierResult {
   readyForMatches: boolean // bot has enough info to send property links
   suggestWarm: boolean // bot believes lead is warm (auto-promote)
   leadName?: string | null // name if the lead mentioned it
+  // ---- scheduling (step 5) ----
+  interestedPropertyIds: string[] // ids (from previously-sent matches) the lead likes
+  readyToSchedule: boolean // lead wants to visit -> begin scheduling
+  availabilityText: string | null // raw availability the lead gave, if any
+  proposedSlotISO: string | null // a concrete tentative slot the bot picked (never today)
+  proposedSlotText: string | null // human-friendly slot, e.g. "kal (Sat) shaam 5 baje"
 }
 
 export interface SessionUser {

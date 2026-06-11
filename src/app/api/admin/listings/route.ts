@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         address: String(body.address ?? ''),
         amenities: JSON.stringify(Array.isArray(body.amenities) ? body.amenities : []),
         images: JSON.stringify(Array.isArray(body.images) ? body.images : []),
+        videos: JSON.stringify(Array.isArray(body.videos) ? body.videos : []),
         status,
         source: 'MANUAL',
         featured: Boolean(body.featured),

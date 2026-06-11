@@ -17,6 +17,8 @@ interface LeadData {
   source: string
   brokerNotified: boolean
   assignedToId: string | null
+  createdByName: string | null
+  conversationStarted: boolean
   aiSummary: string | null
   createdAt: string
   requirements: LeadRequirements
@@ -25,6 +27,16 @@ interface UserRow {
   id: string
   name: string
   role: string
+}
+interface VisitRow {
+  id: string
+  status: string
+  scheduledFor: string | null
+  availabilityText: string | null
+  feedback: string | null
+  notes: string | null
+  coordinatorNotified: boolean
+  propertyTitles: string[]
 }
 interface MatchRow {
   id: string
@@ -65,14 +77,21 @@ function budgetText(req: LeadRequirements): string | null {
   return null
 }
 
+const VISIT_BADGE: Record<string, string> = {
+  PROPOSED: 'badge-gold', TENTATIVE: 'badge-gold', CONFIRMED: 'badge-green',
+  COMPLETED: 'badge-teal', CANCELLED: 'badge-red', NO_SHOW: 'badge-red',
+}
+
 export default function LeadDetailClient({
   lead,
   users,
+  visits,
   matches,
   activities,
 }: {
   lead: LeadData
   users: UserRow[]
+  visits: VisitRow[]
   matches: MatchRow[]
   activities: ActivityRow[]
 }) {
@@ -84,6 +103,43 @@ export default function LeadDetailClient({
   const [error, setError] = useState<string | null>(null)
   const [brokerAlert, setBrokerAlert] = useState<string | null>(null)
   const [notified, setNotified] = useState(lead.brokerNotified)
+  const [convoStarted, setConvoStarted] = useState(lead.conversationStarted)
+
+  const hasPhone = !lead.phone.startsWith('manual:') && !lead.phone.startsWith('web:')
+
+  async function patchVisit(visitId: string, body: Record<string, unknown>, kind: string) {
+    setSaving(kind)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/visits/${visitId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d?.error || 'Update failed') }
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function startConversation() {
+    setSaving('initiate')
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'initiate' }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d?.error || 'Could not start conversation')
+      setConvoStarted(true)
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start conversation')
+    } finally {
+      setSaving(null)
+    }
+  }
 
   async function patch(payload: Record<string, unknown>, kind: string): Promise<boolean> {
     setSaving(kind)
@@ -253,9 +309,69 @@ export default function LeadDetailClient({
           </select>
         </div>
 
+        {lead.createdByName && (
+          <p className="hint" style={{ marginBottom: 4 }}>👤 Added by {lead.createdByName} (coordinates the visit)</p>
+        )}
         <p className="hint">
           Source: {lead.source.toLowerCase()} · created {timeAgo(lead.createdAt)}
         </p>
+
+        {/* Outbound conversation control */}
+        <div style={{ marginTop: '0.9rem', paddingTop: '0.9rem', borderTop: '1px solid rgba(253,248,242,0.07)' }}>
+          {!hasPhone ? (
+            <p className="hint">📵 No phone captured — add one to start the WhatsApp conversation.</p>
+          ) : convoStarted ? (
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="badge badge-green">✅ Conversation started</span>
+              <button className="btn btn-quiet btn-sm" disabled={saving === 'initiate'} onClick={startConversation}>
+                {saving === 'initiate' ? 'Sending…' : 'Re-send opener'}
+              </button>
+            </div>
+          ) : (
+            <button className="btn btn-solid btn-block" disabled={saving === 'initiate'} onClick={startConversation}>
+              {saving === 'initiate' ? 'Starting…' : '💬 Start WhatsApp conversation'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- visits / scheduling ---------- */}
+      <div className="card">
+        <span className="label" style={{ display: 'block', marginBottom: '0.9rem' }}>Visits</span>
+        {visits.length === 0 ? (
+          <p className="hint">No visit scheduled yet. When the lead likes a property and shares availability, Saarthi proposes a tentative slot (never same-day) and pings the coordinator.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {visits.map((v) => (
+              <div key={v.id} style={{ border: '1px solid rgba(253,248,242,0.08)', borderRadius: 12, padding: '0.9rem' }}>
+                <div className="spread" style={{ marginBottom: 8 }}>
+                  <span className={`badge ${VISIT_BADGE[v.status] ?? 'badge-gray'}`}>{statusLabel(v.status) || v.status}</span>
+                  {v.coordinatorNotified && <span className="badge badge-green">📤 Coordinator alerted</span>}
+                </div>
+                {v.scheduledFor && (
+                  <div style={{ fontSize: 14, color: 'var(--cream)', marginBottom: 4 }}>
+                    🗓 {new Date(v.scheduledFor).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
+                    <span className="hint"> (tentative)</span>
+                  </div>
+                )}
+                {v.propertyTitles.length > 0 && (
+                  <div className="hint" style={{ marginBottom: 6 }}>🏠 {v.propertyTitles.join(' · ')}</div>
+                )}
+                {v.availabilityText && <div className="hint" style={{ marginBottom: 6 }}>🕒 Lead said: “{v.availabilityText}”</div>}
+                {v.feedback && <div className="ok-text" style={{ marginBottom: 6 }}>💬 {v.feedback}</div>}
+                {['PROPOSED', 'TENTATIVE'].includes(v.status) && (
+                  <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    <button className="btn btn-solid btn-sm" disabled={saving === `v-${v.id}`} onClick={() => patchVisit(v.id, { status: 'CONFIRMED' }, `v-${v.id}`)}>Confirm</button>
+                    <button className="btn btn-danger btn-sm" disabled={saving === `v-${v.id}`} onClick={() => patchVisit(v.id, { status: 'CANCELLED' }, `v-${v.id}`)}>Cancel</button>
+                  </div>
+                )}
+                {v.status === 'CONFIRMED' && (
+                  <button className="btn btn-quiet btn-sm" style={{ marginTop: 8 }} disabled={saving === `v-${v.id}`} onClick={() => patchVisit(v.id, { status: 'COMPLETED' }, `v-${v.id}`)}>Mark completed</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ---------- requirements ---------- */}

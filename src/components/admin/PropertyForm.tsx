@@ -6,49 +6,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice, propertyTypeLabel } from '@/lib/format'
-import { PROPERTY_TYPES, PROPERTY_STATUSES, FURNISHING, type PropertyType } from '@/types'
+import { PROPERTY_TYPES, PROPERTY_STATUSES, FURNISHING } from '@/types'
 import { statusLabel } from '@/lib/format'
+import type { BrokerOpt, PropertyFormValues } from './property-form-shared'
 
-export interface BrokerOpt { id: string; name: string; role: string }
-
-export interface PropertyFormValues {
-  id?: string
-  title: string
-  type: string
-  listingFor: string
-  bhk: string
-  price: string
-  area: string
-  areaUnit: string
-  furnishing: string
-  floor: string
-  facing: string
-  ageYears: string
-  locality: string
-  city: string
-  address: string
-  amenities: string[]
-  images: string // newline-separated urls
-  description: string
-  ownerName: string
-  ownerPhone: string
-  status: string
-  featured: boolean
-  postedById: string
-  adminNotes: string
-}
+// Re-export the shared types so existing `import { type BrokerOpt } from './PropertyForm'`
+// sites keep working (type-only — erased at build, safe across the client boundary).
+export type { BrokerOpt, PropertyFormValues }
 
 const AMENITY_OPTIONS = ['Lift', 'Covered parking', 'Power backup', '24x7 security', 'Garden', 'Club house', 'Gym', 'Swimming pool', 'Modular kitchen', 'Kids play area', 'Intercom', 'Pet friendly']
 const NO_BHK = ['PLOT', 'COMMERCIAL', 'OFFICE', 'SHOP']
-
-export function emptyValues(brokerId?: string): PropertyFormValues {
-  return {
-    title: '', type: 'FLAT', listingFor: 'SALE', bhk: '', price: '', area: '', areaUnit: 'sqft',
-    furnishing: '', floor: '', facing: '', ageYears: '', locality: '', city: 'Indore', address: '',
-    amenities: [], images: '', description: '', ownerName: '', ownerPhone: '', status: 'ACTIVE',
-    featured: false, postedById: brokerId ?? '', adminNotes: '',
-  }
-}
 
 export default function PropertyForm({
   initial,
@@ -94,6 +61,7 @@ export default function PropertyForm({
       address: v.address,
       amenities: v.amenities,
       images: v.images.split('\n').map((s) => s.trim()).filter(Boolean),
+      videos: v.videos.split('\n').map((s) => s.trim()).filter(Boolean),
       description: v.description,
       ownerName: v.ownerName,
       ownerPhone: v.ownerPhone,
@@ -217,8 +185,12 @@ export default function PropertyForm({
 
         <div className="field full">
           <span className="label">Image URLs (one per line)</span>
-          <textarea className="textarea" style={{ minHeight: 80 }} value={v.images} onChange={(e) => set('images', e.target.value)} placeholder="https://…/photo1.jpg" />
+          <textarea className="textarea" style={{ minHeight: 70 }} value={v.images} onChange={(e) => set('images', e.target.value)} placeholder="https://…/photo1.jpg" />
           <span className="hint">Optional — listings without photos show a styled placeholder.</span>
+        </div>
+        <div className="field full">
+          <span className="label">Video URLs (one per line)</span>
+          <textarea className="textarea" style={{ minHeight: 60 }} value={v.videos} onChange={(e) => set('videos', e.target.value)} placeholder="https://…/walkthrough.mp4" />
         </div>
 
         <div className="field">

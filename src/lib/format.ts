@@ -62,6 +62,8 @@ export function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T
 // "919826078459" -> "+91 98260 78459"
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return ''
+  // Placeholder phones used before a real number is captured.
+  if (phone.startsWith('manual:') || phone.startsWith('web:')) return 'No phone yet'
   const digits = phone.replace(/\D/g, '')
   if (digits.length === 12 && digits.startsWith('91')) {
     return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`

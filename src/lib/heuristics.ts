@@ -48,7 +48,10 @@ function detectLocality(text: string): string {
 }
 
 // Parse a single free-text listing blob (one WhatsApp message / form blob).
-export function heuristicParseListing(raw: string): ParsedListing {
+export function heuristicParseListing(
+  raw: string,
+  meta?: { postedByName?: string | null; mediaCount?: number }
+): ParsedListing {
   const t = raw.toLowerCase()
   const bhkMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:bhk|bed|bedroom)/)
   const bhk = bhkMatch ? Math.round(parseFloat(bhkMatch[1])) : null
@@ -82,12 +85,60 @@ export function heuristicParseListing(raw: string): ParsedListing {
     amenities: [],
     ownerName: null,
     ownerPhone: phoneMatch ? `91${phoneMatch[1]}` : null,
+    postedByName: meta?.postedByName ?? null,
+    mediaCount: meta?.mediaCount ?? 0,
     description: raw.trim(),
     aiSummary: null,
     aiNotes: missing.length ? `Parsed without AI (heuristic mode). Missing: ${missing.join(', ')}.` : 'Parsed without AI (heuristic mode).',
     aiConfidence: missing.length ? 0.4 : 0.6,
     rawText: raw.trim(),
   }
+}
+
+// Split a WhatsApp group export into listing blocks WITH sender attribution and
+// media counts. Recognises "12/05/25, 10:31 - Rajan Verma: <msg>" export lines
+// and "<Media omitted>" / "IMG-x.jpg (file attached)" placeholders.
+export interface ChatBlock {
+  text: string
+  sender: string | null
+  mediaCount: number
+}
+
+const MEDIA_RE = /<\s*media omitted\s*>|\(file attached\)|IMG-\d|VID-\d|\.(jpg|jpeg|png|mp4|webp)\b/gi
+
+export function splitWhatsAppChatBlocks(raw: string): ChatBlock[] {
+  const exportLine = /^\[?(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}),?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?\]?\s*[-–]\s*([^:]{1,40}):\s*(.*)$/i
+  const lines = raw.split('\n')
+  const looksLikeExport = lines.some((l) => exportLine.test(l))
+
+  type Acc = { sender: string | null; parts: string[] }
+  const blocks: Acc[] = []
+  let cur: Acc | null = null
+
+  if (looksLikeExport) {
+    for (const line of lines) {
+      const m = line.match(exportLine)
+      if (m) {
+        if (cur) blocks.push(cur)
+        cur = { sender: m[2].trim(), parts: [m[3] ?? ''] }
+      } else if (cur) {
+        cur.parts.push(line)
+      }
+    }
+    if (cur) blocks.push(cur)
+  } else {
+    for (const b of raw.split(/\n\s*\n/)) blocks.push({ sender: null, parts: [b] })
+  }
+
+  return blocks
+    .map((b) => {
+      const text = b.parts.join('\n').trim()
+      const mediaCount = (text.match(MEDIA_RE) || []).length
+      return { text, sender: b.sender, mediaCount }
+    })
+    .filter((b) => b.text.length > 20)
+    .filter((b) => /\d/.test(b.text) || b.mediaCount > 0)
+    .filter((b) => !/^(ok|okay|thanks|thank you|good morning|gm|👍|🙏|haan|nahi|yes|no)\b/i.test(b.text))
 }
 
 function typeTitle(type: PropertyType): string {

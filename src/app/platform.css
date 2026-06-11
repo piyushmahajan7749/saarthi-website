@@ -133,7 +133,7 @@
 .stat-delta { font-size: 11px; color: #4DC8A8; margin-top: 4px; }
 
 /* ---------- lead pipeline ---------- */
-.pipeline { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem; }
+.pipeline { display: grid; grid-template-columns: repeat(6, minmax(200px, 1fr)); gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem; }
 .pipe-col { background: rgba(253, 248, 242, 0.018); border: 1px solid rgba(253, 248, 242, 0.06); border-radius: 14px; padding: 0.9rem; min-height: 200px; }
 .pipe-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; padding: 0 0.2rem; }
 .pipe-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
@@ -205,5 +205,5 @@
   .chatw-panel { right: 1rem; }
   .gallery { grid-template-columns: 1fr; }
   .gallery-side { grid-template-rows: none; grid-template-columns: 1fr 1fr; }
-  .pipeline { grid-template-columns: repeat(5, 230px); }
+  .pipeline { grid-template-columns: repeat(6, 230px); }
 }

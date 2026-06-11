@@ -17,6 +17,8 @@ export interface BrokerOption {
 interface CardItem {
   include: boolean
   data: ParsedListing
+  images: string[]
+  videos: string[]
 }
 
 function confidenceColor(c: number): string {
@@ -37,8 +39,9 @@ export default function ReviewCards({
   onCommitted: (result: { count: number; published: boolean }) => void
 }) {
   const [items, setItems] = useState<CardItem[]>(() =>
-    listings.map((l) => ({ include: (l.aiConfidence ?? 0) >= 0.5, data: l }))
+    listings.map((l) => ({ include: (l.aiConfidence ?? 0) >= 0.5, data: l, images: [], videos: [] }))
   )
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null)
   const defaultBroker = brokers.find((b) => b.role === 'ADMIN') ?? brokers[0]
   const [postedById, setPostedById] = useState(defaultBroker?.id ?? '')
   const [committing, setCommitting] = useState<'publish' | 'draft' | null>(null)
@@ -52,6 +55,30 @@ export default function ReviewCards({
 
   function toggle(idx: number) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, include: !it.include } : it)))
+  }
+
+  async function uploadMedia(idx: number, files: FileList) {
+    if (!files.length) return
+    setUploadingIdx(idx)
+    try {
+      const fd = new FormData()
+      Array.from(files).forEach((f) => fd.append('files', f))
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Upload failed')
+      const urls: string[] = json.urls ?? []
+      const imgs = urls.filter((u) => /\.(jpe?g|png|webp|gif)$/i.test(u))
+      const vids = urls.filter((u) => /\.(mp4|mov|webm)$/i.test(u))
+      setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, images: [...it.images, ...imgs], videos: [...it.videos, ...vids] } : it)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploadingIdx(null)
+    }
+  }
+
+  function removeMedia(idx: number, url: string) {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, images: it.images.filter((u) => u !== url), videos: it.videos.filter((u) => u !== url) } : it)))
   }
 
   function numOrNull(v: string): number | null {
@@ -68,7 +95,7 @@ export default function ReviewCards({
       const res = await fetch('/api/admin/intake/commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batchId, postedById, publish, listings: selected.map((s) => s.data) }),
+        body: JSON.stringify({ batchId, postedById, publish, listings: selected.map((s) => ({ ...s.data, images: s.images, videos: s.videos })) }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'Commit failed — please try again.')
@@ -262,6 +289,16 @@ export default function ReviewCards({
                   onChange={(e) => update(idx, { ownerPhone: e.target.value || null })}
                 />
               </div>
+              <div className="field">
+                <span className="label">Posted by (broker)</span>
+                <input
+                  className="input"
+                  value={d.postedByName ?? ''}
+                  onChange={(e) => update(idx, { postedByName: e.target.value || null })}
+                  placeholder="WhatsApp group sender"
+                />
+                <span className="hint">Auto-credited to this broker if their name is registered.</span>
+              </div>
               <div className="field full">
                 <span className="label">Description</span>
                 <textarea
@@ -272,6 +309,38 @@ export default function ReviewCards({
                   onChange={(e) => update(idx, { description: e.target.value })}
                 />
               </div>
+            </div>
+
+            {/* media */}
+            <div style={{ marginTop: '0.9rem' }}>
+              <div className="spread" style={{ marginBottom: 8 }}>
+                <span className="label">
+                  Photos &amp; videos{d.mediaCount > 0 ? ` · ${d.mediaCount} in chat` : ''}
+                </span>
+                <label className="btn btn-quiet btn-sm" style={{ cursor: 'pointer' }}>
+                  {uploadingIdx === idx ? 'Uploading…' : '⬆ Attach media'}
+                  <input
+                    type="file" accept="image/*,video/*" multiple hidden
+                    disabled={uploadingIdx !== null}
+                    onChange={(e) => { if (e.target.files) uploadMedia(idx, e.target.files); e.target.value = '' }}
+                  />
+                </label>
+              </div>
+              {d.mediaCount > 0 && item.images.length === 0 && item.videos.length === 0 && (
+                <p className="hint" style={{ marginBottom: 8 }}>
+                  📎 This message had {d.mediaCount} attachment{d.mediaCount === 1 ? '' : 's'} in WhatsApp — re-attach them here so they show on the listing.
+                </p>
+              )}
+              {(item.images.length > 0 || item.videos.length > 0) && (
+                <div className="chips">
+                  {item.images.map((u) => (
+                    <span key={u} className="chip on">🖼 {u.split('/').pop()} <button onClick={() => removeMedia(idx, u)}>✕</button></span>
+                  ))}
+                  {item.videos.map((u) => (
+                    <span key={u} className="chip on">▶ {u.split('/').pop()} <button onClick={() => removeMedia(idx, u)}>✕</button></span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {d.aiNotes && (

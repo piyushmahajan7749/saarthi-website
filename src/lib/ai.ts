@@ -2,12 +2,13 @@
 // heuristic engine in src/lib/heuristics.ts when ANTHROPIC_API_KEY is unset or
 // a call fails — the platform must keep working without AI.
 import Anthropic from '@anthropic-ai/sdk'
-import type { ParsedListing, PropertyFilters, LeadRequirements, QualifierResult } from '@/types'
+import type { ParsedListing, PropertyFilters, LeadRequirements, QualifierResult, ExtractedLead } from '@/types'
 import {
   heuristicParseListing,
   heuristicParseSearch,
   heuristicQualifierTurn,
-  splitWhatsAppChat,
+  splitWhatsAppChatBlocks,
+  parsePriceToken,
 } from './heuristics'
 
 const MODEL = process.env.AI_MODEL || 'claude-opus-4-8'
@@ -45,8 +46,8 @@ const LISTING_ITEM_SCHEMA = {
   additionalProperties: false,
   required: [
     'title', 'type', 'listingFor', 'bhk', 'price', 'area', 'areaUnit', 'furnishing', 'locality',
-    'city', 'address', 'amenities', 'ownerName', 'ownerPhone', 'description', 'aiSummary',
-    'aiNotes', 'aiConfidence', 'rawText',
+    'city', 'address', 'amenities', 'ownerName', 'ownerPhone', 'postedByName', 'mediaCount',
+    'description', 'aiSummary', 'aiNotes', 'aiConfidence', 'rawText',
   ],
   properties: {
     title: { type: 'string', description: 'Short marketable title, e.g. "3 BHK Flat for Sale in Vijay Nagar"' },
@@ -61,8 +62,10 @@ const LISTING_ITEM_SCHEMA = {
     city: { type: 'string' },
     address: { type: 'string' },
     amenities: { type: 'array', items: { type: 'string' } },
-    ownerName: { type: ['string', 'null'] },
+    ownerName: { type: ['string', 'null'], description: 'Property owner/seller name if mentioned in the message body' },
     ownerPhone: { type: ['string', 'null'], description: 'Digits only with country code, e.g. 919826078459' },
+    postedByName: { type: ['string', 'null'], description: 'The WhatsApp group member who POSTED this listing (the chat sender), e.g. "Rajan Verma". Distinct from the property owner.' },
+    mediaCount: { type: 'integer', description: 'How many photos/videos were attached to this message (count "<Media omitted>", "file attached", IMG-/VID- references). 0 if none.' },
     description: { type: 'string', description: 'Clean 2-4 sentence description rewritten from the raw text' },
     aiSummary: { type: ['string', 'null'], description: 'One-line sales pitch' },
     aiNotes: { type: ['string', 'null'], description: 'Comments for the admin: missing fields, red flags, whether price looks high/low for the locality' },
@@ -79,37 +82,39 @@ const LISTINGS_SCHEMA = {
 }
 
 const PARSER_SYSTEM = `You are Saarthi's listing parser for Indian real estate (primary market: Indore, MP).
-Extract EVERY distinct property listing from the input into structured JSON.
+The input is usually an exported BROKER WhatsApp GROUP chat where brokers post inventory. Lines look like "12/05/25, 10:31 - Rajan Verma: 3 BHK flat...". Extract EVERY distinct property listing into structured JSON.
 Rules:
+- postedByName = the chat sender who posted the listing (e.g. "Rajan Verma"). This is who to credit/contact, distinct from the property owner.
+- mediaCount = number of photos/videos attached to that message ("<Media omitted>", "file attached", IMG-/VID- references).
 - Convert Indian price formats: "75L"/"75 lakh" = 7500000, "1.2cr" = 12000000. Rent amounts are per month.
 - Hinglish is common ("makaan", "bechna hai", "kiraya") — interpret it.
 - Skip chatter that is not a property listing (greetings, questions, requirement posts like "chahiye"/"required"/"looking for").
 - If a message is a REQUIREMENT (someone looking to buy/rent) and not an inventory listing, skip it.
-- aiNotes must flag: missing price/locality/contact, suspicious pricing for the locality, anything an admin should verify.
+- aiNotes must flag: missing price/locality/contact, suspicious pricing for the locality, and note if photos/videos are attached (admin should download & attach them).
 - Never invent data. Use null for unknown fields. Keep rawText verbatim per listing.`
 
 export async function parseListingsFromText(raw: string): Promise<ParsedListing[]> {
-  if (!aiEnabled()) {
-    return splitWhatsAppChat(raw).map(heuristicParseListing)
-  }
+  const heuristic = () =>
+    splitWhatsAppChatBlocks(raw).map((b) => heuristicParseListing(b.text, { postedByName: b.sender, mediaCount: b.mediaCount }))
+  if (!aiEnabled()) return heuristic()
   try {
     const { listings } = await structured<{ listings: ParsedListing[] }>(
       PARSER_SYSTEM,
-      `Extract all property listings from this WhatsApp chat / text:\n\n<input>\n${raw.slice(0, 60000)}\n</input>`,
+      `Extract all property listings from this broker WhatsApp group export:\n\n<input>\n${raw.slice(0, 60000)}\n</input>`,
       LISTINGS_SCHEMA
     )
     return listings
   } catch (err) {
     console.error('[ai] parseListingsFromText failed, falling back to heuristics:', err)
-    return splitWhatsAppChat(raw).map(heuristicParseListing)
+    return heuristic()
   }
 }
 
 export async function parseListingsFromRows(rows: Record<string, unknown>[]): Promise<ParsedListing[]> {
   const rowsText = rows.map((r, i) => `Row ${i + 1}: ${JSON.stringify(r)}`).join('\n')
-  if (!aiEnabled()) {
-    return rows.map((r) => heuristicParseListing(Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(', ')))
-  }
+  const rowsHeuristic = () =>
+    rows.map((r) => heuristicParseListing(Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(', ')))
+  if (!aiEnabled()) return rowsHeuristic()
   try {
     const { listings } = await structured<{ listings: ParsedListing[] }>(
       PARSER_SYSTEM,
@@ -119,7 +124,7 @@ export async function parseListingsFromRows(rows: Record<string, unknown>[]): Pr
     return listings
   } catch (err) {
     console.error('[ai] parseListingsFromRows failed, falling back to heuristics:', err)
-    return rows.map((r) => heuristicParseListing(Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(', ')))
+    return rowsHeuristic()
   }
 }
 
@@ -168,49 +173,115 @@ export async function parseSearchQuery(query: string): Promise<PropertyFilters> 
 }
 
 // ---------------------------------------------------------------------------
-// 3. Lead qualifier bot (WhatsApp + website chat)
+// 3a. Lead extraction — admin's voice/text note -> structured lead
+// ---------------------------------------------------------------------------
+
+const REQUIREMENTS_SCHEMA_PROPS = {
+  listingFor: { type: ['string', 'null'], enum: ['SALE', 'RENT', null] },
+  type: { type: ['string', 'null'], enum: ['FLAT', 'HOUSE', 'VILLA', 'PLOT', 'COMMERCIAL', 'OFFICE', 'SHOP', 'PG', null] },
+  bhk: { type: ['integer', 'null'] },
+  budgetMin: { type: ['number', 'null'], description: 'Rupees' },
+  budgetMax: { type: ['number', 'null'], description: 'Rupees' },
+  localities: { type: 'array', items: { type: 'string' } },
+  city: { type: ['string', 'null'] },
+  timeline: { type: ['string', 'null'] },
+  purpose: { type: ['string', 'null'] },
+  notes: { type: ['string', 'null'] },
+}
+const REQUIREMENTS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['listingFor', 'type', 'bhk', 'budgetMin', 'budgetMax', 'localities', 'city', 'timeline', 'purpose', 'notes'],
+  properties: REQUIREMENTS_SCHEMA_PROPS,
+}
+
+const EXTRACT_LEAD_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'phone', 'requirements', 'aiSummary', 'notes', 'confidence'],
+  properties: {
+    name: { type: ['string', 'null'], description: 'Lead\'s name if stated' },
+    phone: { type: ['string', 'null'], description: 'Digits only, with country code (prefix 91 for a bare 10-digit Indian number)' },
+    requirements: REQUIREMENTS_SCHEMA,
+    aiSummary: { type: 'string', description: 'One-sentence summary of who this lead is and what they want' },
+    notes: { type: ['string', 'null'], description: 'Anything else the staff member said worth keeping (how they met, urgency, etc.)' },
+    confidence: { type: 'number', description: '0..1 how confident the extraction is' },
+  },
+}
+
+// Used by the admin "Add lead" feature (text typed, or a transcribed voice note).
+export async function extractLeadFromText(text: string): Promise<ExtractedLead> {
+  const fallback = (): ExtractedLead => {
+    const phoneMatch = text.match(/(?:\+?91[\s-]?)?([6-9]\d{9})\b/)
+    const bhk = text.match(/(\d+)\s*bhk/i)
+    const price = parsePriceToken(text)
+    const nameMatch = text.match(/\b(?:name is|naam|mr\.?|ms\.?|client)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/)
+    return {
+      name: nameMatch ? nameMatch[1] : null,
+      phone: phoneMatch ? `91${phoneMatch[1]}` : null,
+      requirements: {
+        listingFor: /\brent|kiraya|lease\b/i.test(text) ? 'RENT' : /\bbuy|sale|purchase|lena\b/i.test(text) ? 'SALE' : undefined,
+        bhk: bhk ? parseInt(bhk[1], 10) : undefined,
+        budgetMax: price ?? undefined,
+        notes: text.trim().slice(0, 500),
+      },
+      aiSummary: `Lead captured (heuristic): ${text.trim().slice(0, 120)}`,
+      notes: null,
+      confidence: 0.4,
+    }
+  }
+  if (!aiEnabled()) return fallback()
+  try {
+    return await structured<ExtractedLead>(
+      'You convert a real-estate agent\'s quick note (typed or transcribed from voice, often Hinglish) about a prospective buyer/renter into a structured lead. Extract name, phone, and requirements. "75 lakh" => 7500000. Prefix bare 10-digit Indian numbers with 91. Never invent a phone number.',
+      `Agent's note about a new lead:\n"""${text.slice(0, 4000)}"""`,
+      EXTRACT_LEAD_SCHEMA,
+      1500
+    )
+  } catch (err) {
+    console.error('[ai] extractLeadFromText failed, falling back:', err)
+    return fallback()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3b. Lead qualifier bot (WhatsApp + website chat)
 // ---------------------------------------------------------------------------
 
 const QUALIFIER_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['reply', 'requirements', 'aiSummary', 'score', 'readyForMatches', 'suggestWarm', 'leadName'],
+  required: [
+    'reply', 'requirements', 'aiSummary', 'score', 'readyForMatches', 'suggestWarm', 'leadName',
+    'interestedPropertyIds', 'readyToSchedule', 'availabilityText', 'proposedSlotISO', 'proposedSlotText',
+  ],
   properties: {
     reply: { type: 'string', description: 'Next WhatsApp message to the lead. Warm, concise (under 60 words), Hinglish ok, max ONE question.' },
-    requirements: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['listingFor', 'type', 'bhk', 'budgetMin', 'budgetMax', 'localities', 'city', 'timeline', 'purpose', 'notes'],
-      properties: {
-        listingFor: { type: ['string', 'null'], enum: ['SALE', 'RENT', null] },
-        type: { type: ['string', 'null'], enum: ['FLAT', 'HOUSE', 'VILLA', 'PLOT', 'COMMERCIAL', 'OFFICE', 'SHOP', 'PG', null] },
-        bhk: { type: ['integer', 'null'] },
-        budgetMin: { type: ['number', 'null'], description: 'Rupees' },
-        budgetMax: { type: ['number', 'null'], description: 'Rupees' },
-        localities: { type: 'array', items: { type: 'string' } },
-        city: { type: ['string', 'null'] },
-        timeline: { type: ['string', 'null'] },
-        purpose: { type: ['string', 'null'] },
-        notes: { type: ['string', 'null'] },
-      },
-    },
+    requirements: REQUIREMENTS_SCHEMA,
     aiSummary: { type: 'string', description: 'Running 1-2 sentence summary of who this lead is and what they want' },
     score: { type: 'integer', description: '0-100 qualification score. 70+ = clearly serious: budget+area known, near-term timeline' },
-    readyForMatches: { type: 'boolean', description: 'true when listingFor + budget + (bhk or type) + locality are known' },
-    suggestWarm: { type: 'boolean', description: 'true when lead is engaged AND qualified (score>=70): asked for visits, responded to specific properties, near-term timeline' },
+    readyForMatches: { type: 'boolean', description: 'true when listingFor + budget + (bhk or type) + locality are known AND no matches sent yet this round' },
+    suggestWarm: { type: 'boolean', description: 'true when lead is engaged AND qualified (score>=70)' },
     leadName: { type: ['string', 'null'], description: 'Lead\'s name if they mentioned it, else null' },
+    interestedPropertyIds: { type: 'array', items: { type: 'string' }, description: 'From the SENT MATCHES list, the property ids the lead expressed interest in. Empty if none yet.' },
+    readyToSchedule: { type: 'boolean', description: 'true ONLY when the lead likes one or more sent properties AND wants to visit/see them' },
+    availabilityText: { type: ['string', 'null'], description: 'The lead\'s stated availability (e.g. "Saturday evening", "kal ke baad anytime"), else null' },
+    proposedSlotISO: { type: ['string', 'null'], description: 'A concrete tentative visit datetime in ISO-8601 you propose. MUST be tomorrow or later (never today). Null until you have their availability.' },
+    proposedSlotText: { type: ['string', 'null'], description: 'Human-friendly version of the proposed slot, e.g. "kal (Sat) shaam 5 baje".' },
   },
 }
 
 const QUALIFIER_SYSTEM = `You are Saarthi (सारथी), an AI real-estate assistant chatting with property seekers on WhatsApp for a brokerage in Indore, India.
 
-Your job — qualify the lead WITHOUT being pushy:
-1. Understand: buy or rent → property type/BHK → budget → preferred localities → timeline.
-2. Ask exactly ONE question per message. Keep messages under 60 words, friendly, professional. Mirror the lead's language (Hindi/Hinglish/English).
-3. Once you know listingFor + budget + (bhk or type) + at least one locality, set readyForMatches=true — the system will then send matching property links automatically. Don't invent properties yourself.
-4. After matches were sent (visible in history as [MATCHES SENT...]), help with follow-ups: more options, visit requests, specific questions. If they want a visit or are clearly serious, set suggestWarm=true — a human broker will then call them.
-5. Never discuss commission/legal advice; say the broker will help with that.
-6. Always merge new info into the FULL requirements object (carry over previous values unless corrected).`
+Stages — move through them naturally, ONE question per message, under 60 words, mirror the lead's language (Hindi/Hinglish/English):
+1. QUALIFY: buy or rent → type/BHK → budget → localities → timeline. When listingFor + budget + (bhk or type) + a locality are known, set readyForMatches=true (the system sends matching property links — never invent properties).
+2. REACT: after matches are sent (history shows [MATCHES SENT...]), ask which they like / offer more. Put the ids they like into interestedPropertyIds (use the SENT MATCHES id list given to you).
+3. SCHEDULE: when they like a property and want to visit, set readyToSchedule=true.
+   - First get their availability → availabilityText.
+   - Then propose ONE concrete tentative slot: proposedSlotISO + proposedSlotText. CRITICAL: the slot must be TOMORROW OR LATER — never today (the broker may not be free same-day). Use the TODAY date given to you to compute this. Frame it as tentative: "main aapke liye <slot> tentatively rakh raha hoon, broker confirm karke final karega."
+   - Tell them our team will confirm the final time with the property owner/broker.
+4. Never discuss commission/legal/price negotiation — say the broker will help.
+Always merge new info into the FULL requirements object (carry previous values unless corrected). Only set proposedSlotISO once you actually have their availability.`
 
 export async function qualifierTurn(args: {
   history: { direction: string; content: string }[]
@@ -218,21 +289,46 @@ export async function qualifierTurn(args: {
   requirements: LeadRequirements
   leadName?: string | null
   matchesSentCount: number
+  sentMatches?: { id: string; title: string }[]
+  todayLabel?: string
+  tomorrowISO?: string
 }): Promise<QualifierResult> {
-  const { history, incoming, requirements, leadName, matchesSentCount } = args
+  const { history, incoming, requirements, leadName, matchesSentCount, sentMatches = [], todayLabel, tomorrowISO } = args
 
   if (!aiEnabled()) {
     const h = heuristicQualifierTurn(history, incoming, requirements)
     const filled = [h.requirements.listingFor, h.requirements.budgetMax, h.requirements.bhk ?? h.requirements.type, h.requirements.localities?.length].filter(Boolean).length
-    const wantsVisit = /visit|dekhna|dikha|interested|pasand|call me|schedule/i.test(incoming)
+    const wantsVisit = /visit|dekhna|dikhao|dekh|interested|pasand|achhi|like|schedule|book/i.test(incoming)
+    const gaveAvailability = /\b(today|kal|tomorrow|saturday|sunday|sat|sun|monday|tuesday|wednesday|thursday|friday|evening|morning|shaam|subah|\d\s*(am|pm)|baje|weekend|anytime|free)\b/i.test(incoming)
+    // Did the bot just ask for availability? Then this turn's reply is the answer,
+    // even without a fresh "visit" keyword.
+    const lastBot = [...history].reverse().find((m) => m.direction === 'OUTBOUND')?.content ?? ''
+    const askedAvailability = /kab visit|kab free|availability|aaj nahi/i.test(lastBot)
+    const schedulingMode = matchesSentCount > 0 && (wantsVisit || askedAvailability)
+
+    let proposedSlotISO: string | null = null
+    let proposedSlotText: string | null = null
+    let reply = h.reply
+    if (schedulingMode && !gaveAvailability) {
+      reply = 'Badhiya! 🙌 Aap kab visit kar sakte hain? (kal ya uske baad koi bhi din/time — aaj nahi, kyunki broker ki availability confirm karni hoti hai)'
+    } else if (schedulingMode && gaveAvailability && tomorrowISO) {
+      proposedSlotISO = tomorrowISO
+      proposedSlotText = 'kal (tentative)'
+      reply = `Perfect! Main *${proposedSlotText}* tentatively rakh raha hoon. Humari team property owner/broker se confirm karke aapko final time bata degi. 🏡`
+    }
     return {
-      reply: h.reply,
+      reply,
       requirements: h.requirements,
-      aiSummary: `Heuristic mode. Requirements so far: ${JSON.stringify(h.requirements)}`,
-      score: Math.min(95, filled * 20 + (wantsVisit ? 20 : 0)),
-      readyForMatches: h.readyForMatches,
-      suggestWarm: matchesSentCount > 0 && wantsVisit,
+      aiSummary: `Heuristic mode. Requirements: ${JSON.stringify(h.requirements)}`,
+      score: Math.min(95, filled * 20 + (schedulingMode ? 25 : 0)),
+      readyForMatches: h.readyForMatches && matchesSentCount === 0,
+      suggestWarm: schedulingMode,
       leadName: leadName ?? null,
+      interestedPropertyIds: schedulingMode && sentMatches[0] ? [sentMatches[0].id] : [],
+      readyToSchedule: Boolean(proposedSlotISO),
+      availabilityText: gaveAvailability ? incoming.slice(0, 200) : null,
+      proposedSlotISO,
+      proposedSlotText,
     }
   }
 
@@ -241,13 +337,24 @@ export async function qualifierTurn(args: {
     .map((m) => `${m.direction === 'INBOUND' ? 'Lead' : 'Saarthi'}: ${m.content}`)
     .join('\n')
 
+  const fallbackResult = (): QualifierResult => {
+    const h = heuristicQualifierTurn(history, incoming, requirements)
+    return {
+      reply: h.reply, requirements: h.requirements, aiSummary: 'AI unavailable — heuristic qualification.',
+      score: 40, readyForMatches: h.readyForMatches && matchesSentCount === 0, suggestWarm: false, leadName: leadName ?? null,
+      interestedPropertyIds: [], readyToSchedule: false, availabilityText: null, proposedSlotISO: null, proposedSlotText: null,
+    }
+  }
+
   try {
     return await structured<QualifierResult>(
       QUALIFIER_SYSTEM,
       [
+        `TODAY is ${todayLabel ?? 'unknown'}. The earliest allowed visit slot is TOMORROW (${tomorrowISO ?? 'next day'}) — never propose today.`,
         leadName ? `Lead name: ${leadName}` : 'Lead name unknown.',
         `Known requirements: ${JSON.stringify(requirements)}`,
-        `Property links already sent to this lead: ${matchesSentCount}`,
+        `Property links already sent: ${matchesSentCount}`,
+        sentMatches.length ? `SENT MATCHES (id — title):\n${sentMatches.map((m) => `${m.id} — ${m.title}`).join('\n')}` : 'No specific matches sent yet.',
         `Conversation so far:\n${transcript || '(none — this is the first message)'}`,
         `New message from lead: "${incoming}"`,
         'Respond with the structured result.',
@@ -257,16 +364,7 @@ export async function qualifierTurn(args: {
     )
   } catch (err) {
     console.error('[ai] qualifierTurn failed, falling back to heuristics:', err)
-    const h = heuristicQualifierTurn(history, incoming, requirements)
-    return {
-      reply: h.reply,
-      requirements: h.requirements,
-      aiSummary: 'AI unavailable — heuristic qualification.',
-      score: 40,
-      readyForMatches: h.readyForMatches,
-      suggestWarm: false,
-      leadName: leadName ?? null,
-    }
+    return fallbackResult()
   }
 }
 

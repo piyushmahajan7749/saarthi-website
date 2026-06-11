@@ -63,6 +63,99 @@ export function formatMatchesMessage(matches: { property: Property; reasons: str
   return lines.join('\n')
 }
 
+// Resolve and download an inbound WhatsApp media object (image/video/audio).
+// Returns the bytes + mime, or null in dev / on failure. Two-step per Cloud API:
+// GET /{media-id} -> { url }, then GET that url with the bearer token.
+export async function fetchWhatsAppMedia(mediaId: string): Promise<{ bytes: Buffer; mime: string } | null> {
+  if (!whatsappConfigured()) {
+    console.log(`[whatsapp:dev] would download media ${mediaId}`)
+    return null
+  }
+  try {
+    const metaRes = await fetch(`${GRAPH_URL}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` },
+    })
+    if (!metaRes.ok) return null
+    const meta = (await metaRes.json()) as { url?: string; mime_type?: string }
+    if (!meta.url) return null
+    const binRes = await fetch(meta.url, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` } })
+    if (!binRes.ok) return null
+    const bytes = Buffer.from(await binRes.arrayBuffer())
+    return { bytes, mime: meta.mime_type || 'application/octet-stream' }
+  } catch (err) {
+    console.error('[whatsapp] media download failed:', err)
+    return null
+  }
+}
+
+// Tentative-visit proposal sent to the lead.
+export function formatVisitProposal(args: {
+  leadName: string | null
+  slotText: string
+  properties: { title: string }[]
+}): string {
+  const { leadName, slotText, properties } = args
+  const hello = leadName ? `${leadName}, ` : ''
+  const list = properties.map((p, i) => `   ${i + 1}. ${p.title}`).join('\n')
+  return [
+    `${hello}maine aapke liye visit tentatively schedule kar diya hai: 📅`,
+    '',
+    `🕒 *${slotText}*`,
+    properties.length ? `\nProperties:\n${list}` : '',
+    '',
+    'Humari team property owner/broker se final time confirm karke aapko bata degi. Aapko koi aur time chahiye toh bata dijiye! 🙏',
+  ].filter((l) => l !== '').join('\n')
+}
+
+// Coordination alert to the staff member who added the lead (the coordinator) —
+// they take it forward with the listing brokers directly.
+export function formatVisitCoordinationAlert(args: {
+  leadName: string | null
+  leadPhone: string
+  slotText: string
+  summary: string
+  properties: { title: string; id: string; postedBy: string | null }[]
+}): string {
+  const { leadName, leadPhone, slotText, summary, properties } = args
+  const list = properties
+    .map((p, i) => `${i + 1}. ${p.title}${p.postedBy ? ` — broker: ${p.postedBy}` : ''}\n   ${propertyUrl(p.id)}`)
+    .join('\n')
+  return [
+    '📅 *Visit to coordinate — your lead is ready!*',
+    '',
+    `*Lead:* ${leadName || 'Name not shared'} (+${leadPhone.replace(/\D/g, '')})`,
+    `*Summary:* ${summary}`,
+    `*Tentative slot:* ${slotText}`,
+    '',
+    '*Selected properties:*',
+    list,
+    '',
+    'Please coordinate the final time with the listing broker(s) and confirm with the lead.',
+    `Manage: ${siteUrl()}/admin/leads`,
+  ].join('\n')
+}
+
+// Outbound opener when staff add a lead — bot starts qualification.
+export function formatLeadOpener(leadName: string | null): string {
+  const hello = leadName ? `Namaste ${leadName}! 🙏` : 'Namaste! 🙏'
+  return `${hello} Main *Saarthi* hoon, ${process.env.NEXT_PUBLIC_SITE_NAME || 'aapki property search'} ka AI assistant. Aapki property requirement samajhne ke liye 2 minute chahiye. Aap *buy* karna chahte hain ya *rent* par dhoondh rahe hain? 🏡`
+}
+
+export function formatVisitReminder(args: { leadName: string | null; slotText: string }): string {
+  const hello = args.leadName ? `${args.leadName}, ` : ''
+  return `${hello}reminder 🔔 — aapki property visit *${args.slotText}* ke liye tentatively scheduled hai. Humari team confirm karke aapko final details bhejegi. Visit ke liye ready hain? 😊`
+}
+
+export function formatFollowupMessage(leadName: string | null): string {
+  const hello = leadName ? `${leadName}, ` : ''
+  return `${hello}namaste! 🙏 Kya aap abhi bhi property dhoondh rahe hain? Maine kuch nayi listings dekhi hain jo aapke liye perfect ho sakti hain. Bataiye toh main bhej doon? 🏡`
+}
+
+export function formatVisitFeedbackRequest(leadName: string | null): string {
+  const hello = leadName ? `${leadName}, ` : ''
+  return `${hello}visit kaisi rahi? 😊 Property pasand aayi ya kuch aur dekhna chahenge? Aapka feedback bataiye — main aur behtar options dhoondh sakta hoon.`
+}
+
 // Alert sent to the broker who owns the listing / is assigned, when a lead turns warm.
 export function formatWarmLeadAlert(args: {
   leadName: string | null

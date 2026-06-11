@@ -37,10 +37,10 @@ async function main() {
     P({ title: '3 BHK Premium Flat in Vijay Nagar', type: 'FLAT', listingFor: 'SALE', bhk: 3, price: 8500000, area: 1650, locality: 'Vijay Nagar', address: 'Scheme 54 PU4, near C21 Mall', description: 'East-facing 3 BHK on the 7th floor with club house, covered parking and 24x7 security. Walking distance from C21 Mall and Medanta Hospital.', amenities: ['Club house', 'Covered parking', 'Power backup', 'Lift', 'Gym', '24x7 security'], furnishing: 'SEMI_FURNISHED', floor: '7th of 12', facing: 'East', ageYears: 3, featured: true, postedById: rajan.id, source: 'MANUAL', aiSummary: 'Well-priced 3 BHK near C21 Mall — strong family locality with good resale.', views: 142 }),
     P({ title: '2 BHK Ready-to-Move Flat in Nipania', type: 'FLAT', listingFor: 'SALE', bhk: 2, price: 5400000, area: 1100, locality: 'Nipania', address: 'Near Brilliant Convention Centre', description: 'Compact 2 BHK in a gated township with garden view. Ready to move, loan approved project.', amenities: ['Garden', 'Kids play area', 'Lift', 'Security'], furnishing: 'UNFURNISHED', floor: '3rd of 8', facing: 'North-East', ageYears: 1, featured: true, postedById: priya.id, source: 'MANUAL', aiSummary: 'Entry-level 2 BHK in fast-growing Nipania corridor.', views: 98 }),
     P({ title: '4 BHK Independent Bungalow in Saket', type: 'HOUSE', listingFor: 'SALE', bhk: 4, price: 27500000, area: 3200, locality: 'Saket', address: 'Saket Nagar, near Shreemaya', description: 'Corner bungalow with private lawn, modular kitchen and servant quarter. Premium old-Indore address.', amenities: ['Private lawn', 'Modular kitchen', 'Servant room', 'Bore + Narmada line'], furnishing: 'FURNISHED', facing: 'East', ageYears: 8, featured: true, postedById: rajan.id, source: 'MANUAL', aiSummary: 'Rare corner bungalow in Saket — premium segment, negotiable.', views: 211 }),
-    P({ title: '2 BHK Flat for Rent in Mahalakshmi Nagar', type: 'FLAT', listingFor: 'RENT', bhk: 2, price: 18000, area: 1050, locality: 'Mahalakshmi Nagar', address: 'Near Bengali Square flyover', description: 'Semi-furnished 2 BHK with wardrobes and kitchen cabinets. Family preferred. Society with garden.', amenities: ['Wardrobes', 'Garden', 'Lift', 'Parking'], furnishing: 'SEMI_FURNISHED', floor: '2nd of 5', ageYears: 4, postedById: priya.id, source: 'WHATSAPP', rawText: '2bhk flat mahalakshmi nagar rent 18k semi furnished family only call 9812345678', aiNotes: 'Parsed from WhatsApp. Owner prefers family tenants.', views: 67 }),
+    P({ title: '2 BHK Flat for Rent in Mahalakshmi Nagar', type: 'FLAT', listingFor: 'RENT', bhk: 2, price: 18000, area: 1050, locality: 'Mahalakshmi Nagar', address: 'Near Bengali Square flyover', description: 'Semi-furnished 2 BHK with wardrobes and kitchen cabinets. Family preferred. Society with garden.', amenities: ['Wardrobes', 'Garden', 'Lift', 'Parking'], furnishing: 'SEMI_FURNISHED', floor: '2nd of 5', ageYears: 4, postedById: priya.id, postedByName: 'Priya Joshi', source: 'WHATSAPP', rawText: '2bhk flat mahalakshmi nagar rent 18k semi furnished family only call 9812345678', aiNotes: 'Parsed from broker WhatsApp group. Owner prefers family tenants.', views: 67 }),
     P({ title: '3 BHK Villa for Rent in Bicholi Mardana', type: 'VILLA', listingFor: 'RENT', bhk: 3, price: 35000, area: 2200, locality: 'Bicholi Mardana', address: 'Omaxe City 2', description: 'Independent villa in gated township with club membership. Pet friendly, ideal for working professionals.', amenities: ['Club house', 'Swimming pool', 'Pet friendly', 'Gated township'], furnishing: 'SEMI_FURNISHED', ageYears: 2, featured: true, postedById: rajan.id, source: 'MANUAL', views: 88 }),
     P({ title: '1500 sqft Plot in Rau', type: 'PLOT', listingFor: 'SALE', bhk: null, price: 4200000, area: 1500, locality: 'Rau', address: 'Rau-Pithampur Road, near IIM Indore', description: 'Clear-title residential plot in approved colony, 40 ft road, near IIM Indore. T&CP and RERA approved.', amenities: ['RERA approved', '40ft road', 'Boundary done'], source: 'EXCEL', postedById: priya.id, rawText: 'Row 4: Plot, Rau, 1500 sqft, 42L, clear title, RERA', aiNotes: 'Parsed from Excel sheet. Verify khasra number before visit.', views: 45 }),
-    P({ title: '2 BHK Flat in Sukhliya', type: 'FLAT', listingFor: 'SALE', bhk: 2, price: 4500000, area: 980, locality: 'Sukhliya', address: 'Dewas Naka side', description: 'Budget-friendly 2 BHK near Dewas Naka industrial belt. Good rental yield potential.', amenities: ['Lift', 'Parking', 'Power backup'], furnishing: 'UNFURNISHED', floor: '5th of 9', ageYears: 5, postedById: rajan.id, source: 'WHATSAPP', rawText: '2bhk sukhliya 45 lakh 980 sqft 5th floor lift parking urgent sale', aiNotes: 'Owner says urgent sale — possible negotiation room.', views: 54 }),
+    P({ title: '2 BHK Flat in Sukhliya', type: 'FLAT', listingFor: 'SALE', bhk: 2, price: 4500000, area: 980, locality: 'Sukhliya', address: 'Dewas Naka side', description: 'Budget-friendly 2 BHK near Dewas Naka industrial belt. Good rental yield potential.', amenities: ['Lift', 'Parking', 'Power backup'], furnishing: 'UNFURNISHED', floor: '5th of 9', ageYears: 5, postedById: rajan.id, postedByName: 'Rajan Verma', source: 'WHATSAPP', rawText: '2bhk sukhliya 45 lakh 980 sqft 5th floor lift parking urgent sale', aiNotes: 'Parsed from broker WhatsApp group. Owner says urgent sale — possible negotiation room.', views: 54 }),
     P({ title: 'Office Space on AB Road, Palasia', type: 'OFFICE', listingFor: 'RENT', bhk: null, price: 85000, area: 1800, locality: 'Palasia', address: 'AB Road, above ICICI Bank', description: 'Fully furnished plug-and-play office with 20 workstations, 2 cabins, conference room and reserved parking.', amenities: ['20 workstations', 'Conference room', 'AC', 'Lift', 'Parking'], furnishing: 'FURNISHED', floor: '2nd of 4', postedById: priya.id, source: 'MANUAL', views: 39 }),
     P({ title: '3 BHK Flat in Scheme 78', type: 'FLAT', listingFor: 'SALE', bhk: 3, price: 7200000, area: 1450, locality: 'Scheme 78', address: 'Near Vishesh Hospital', description: 'North-facing 3 BHK with two balconies and reserved parking. Society with intercom security.', amenities: ['2 balconies', 'Intercom', 'Parking', 'Lift'], furnishing: 'SEMI_FURNISHED', floor: '4th of 10', ageYears: 6, postedById: rajan.id, source: 'MANUAL', views: 76 }),
     P({ title: '1 BHK for Rent near Bhawarkua', type: 'FLAT', listingFor: 'RENT', bhk: 1, price: 9500, area: 550, locality: 'Bhawarkua', address: 'Near Holkar Science College', description: 'Compact 1 BHK ideal for students or working singles. Walking distance from coaching hub.', amenities: ['Water 24x7', 'Separate entry'], furnishing: 'UNFURNISHED', floor: '1st of 3', postedById: priya.id, source: 'WHATSAPP', rawText: '1bhk bhawarkua 9500 students ok near holkar college', views: 102 }),
@@ -68,7 +68,7 @@ async function main() {
       name: 'Suresh Mehta', phone: '917000112233', source: 'WHATSAPP', status: 'WARM', score: 85,
       requirements: JSON.stringify({ listingFor: 'SALE', type: 'FLAT', bhk: 3, budgetMax: 9000000, localities: ['Vijay Nagar', 'Scheme 78'], timeline: '1-3 months', purpose: 'self-use' }),
       aiSummary: 'Family buyer, works near Vijay Nagar. Wants 3 BHK under ₹90L, ready for site visits on weekends.',
-      assignedToId: rajan.id, brokerNotified: true,
+      assignedToId: rajan.id, createdById: rajan.id, brokerNotified: true, conversationStarted: true,
     },
   })
   await db.message.createMany({
@@ -114,6 +114,20 @@ async function main() {
       aiSummary: 'Asked about plots in Rau, exploring only — timeline 1+ year.',
     },
   })
+
+  // A tentative visit for the warm lead (tomorrow 5pm IST), to coordinate.
+  if (vijayNagarFlat) {
+    const tomorrow5pm = new Date()
+    tomorrow5pm.setDate(tomorrow5pm.getDate() + 1)
+    tomorrow5pm.setHours(17, 0, 0, 0)
+    await db.visit.create({
+      data: {
+        leadId: leadA.id, status: 'TENTATIVE', propertyIds: JSON.stringify([vijayNagarFlat.id]),
+        scheduledFor: tomorrow5pm, availabilityText: 'weekend evening', coordinatorId: rajan.id, coordinatorNotified: true,
+      },
+    })
+    await db.activity.create({ data: { type: 'VISIT_PROPOSED', description: 'Tentative visit scheduled — coordinator (Rajan) to confirm with broker', leadId: leadA.id } })
+  }
 
   console.log('Seed complete:')
   console.log(`  Admin login   -> phone: ${adminPhone}, password: ${adminPassword}`)
