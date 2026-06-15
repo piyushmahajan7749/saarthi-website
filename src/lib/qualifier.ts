@@ -191,7 +191,7 @@ export async function handleInboundLeadMessage(args: {
     let pickedIds = result.interestedPropertyIds.filter((id) => sentIds.has(id))
     if (pickedIds.length === 0 && sentMatches.length) pickedIds = [sentMatches[0].id]
 
-    const { visit, alert } = await scheduleVisit({
+    const { visit, alert } = await scheduleTentativeVisit({
       leadId: lead.id,
       propertyIds: pickedIds,
       slot,
@@ -245,7 +245,9 @@ export async function handleInboundLeadMessage(args: {
 
 // Create/refresh a tentative Visit and alert the coordinator (the staff member
 // who added the lead). They take it forward with the listing brokers.
-async function scheduleVisit(args: {
+// Exported: the Agent API (/api/agent/visit) reuses this so the external
+// WhatsApp brain (cx-agent) gets identical rules — incl. never-same-day.
+export async function scheduleTentativeVisit(args: {
   leadId: string
   propertyIds: string[]
   slot: Date
