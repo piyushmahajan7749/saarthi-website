@@ -119,6 +119,29 @@ export default function IntakeClient({
   const [waResult, setWaResult] = useState<ParseResult | null>(null)
   const [waSuccess, setWaSuccess] = useState<CommitSummary | null>(null)
 
+  // Media pool: uploaded before parsing so they can be auto-distributed to listings
+  const [mediaPool, setMediaPool] = useState<string[]>([])
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const [mediaDragOver, setMediaDragOver] = useState(false)
+
+  async function uploadMediaPool(files: FileList | File[]) {
+    const arr = Array.from(files).filter((f) => /\.(jpe?g|png|webp|gif|mp4|mov|webm)$/i.test(f.name))
+    if (!arr.length) return
+    setMediaUploading(true)
+    try {
+      const fd = new FormData()
+      arr.forEach((f) => fd.append('files', f))
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Upload failed')
+      setMediaPool((prev) => [...prev, ...(json.urls ?? [])])
+    } catch {
+      // non-fatal — user can attach per card if this fails
+    } finally {
+      setMediaUploading(false)
+    }
+  }
+
   async function parseText() {
     if (!text.trim() || waParsing) return
     setWaParsing(true)
@@ -237,8 +260,63 @@ export default function IntakeClient({
                   Paste an exported chat or any jumble of listing messages — Saarthi AI splits and structures them.
                 </span>
               </div>
+
+              {/* Media pool — optional, upload before parsing */}
+              <div className="field" style={{ marginTop: '0.8rem' }}>
+                <span className="label">
+                  Photos &amp; videos{' '}
+                  <span className="hint" style={{ fontWeight: 400 }}>— optional, from WhatsApp export</span>
+                </span>
+                <label
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '1.1rem 1.4rem',
+                    border: `1.5px dashed ${mediaDragOver ? 'var(--o)' : 'rgba(200,96,26,0.28)'}`,
+                    borderRadius: 12,
+                    background: mediaDragOver ? 'rgba(200,96,26,0.06)' : 'rgba(0,0,0,0.15)',
+                    cursor: mediaUploading ? 'default' : 'pointer',
+                    transition: 'all 0.18s',
+                    textAlign: 'center',
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); setMediaDragOver(true) }}
+                  onDragLeave={() => setMediaDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setMediaDragOver(false)
+                    if (!mediaUploading && e.dataTransfer.files.length) uploadMediaPool(e.dataTransfer.files)
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{mediaUploading ? '⏳' : '📸'}</span>
+                  <span className="hint">
+                    {mediaUploading
+                      ? `Uploading ${mediaPool.length > 0 ? `(${mediaPool.length} done…)` : '…'}`
+                      : mediaPool.length > 0
+                      ? `${mediaPool.length} file${mediaPool.length === 1 ? '' : 's'} ready — drop more or parse`
+                      : 'Drop images/videos here — auto-distributed to listings on parse'}
+                  </span>
+                  <input
+                    type="file" accept="image/*,video/*" multiple hidden
+                    disabled={mediaUploading}
+                    onChange={(e) => { if (e.target.files?.length) uploadMediaPool(e.target.files); e.currentTarget.value = '' }}
+                  />
+                </label>
+                {mediaPool.length > 0 && (
+                  <div className="chips" style={{ marginTop: 8 }}>
+                    {mediaPool.map((u) => (
+                      <span key={u} className="chip on" style={{ fontSize: 12 }}>
+                        🖼 {u.split('/').pop()?.split('-').slice(1).join('-') || u.split('/').pop()}
+                        <button onClick={() => setMediaPool((p) => p.filter((x) => x !== u))}>✕</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="row" style={{ marginTop: '1rem' }}>
-                <button className="btn btn-solid" disabled={!text.trim() || waParsing} onClick={parseText}>
+                <button className="btn btn-solid" disabled={!text.trim() || waParsing || mediaUploading} onClick={parseText}>
                   {waParsing ? 'Parsing…' : 'Parse with AI ✦'}
                 </button>
                 {waError && <span className="error-text">{waError}</span>}
@@ -253,6 +331,7 @@ export default function IntakeClient({
                   onClick={() => {
                     setWaResult(null)
                     setWaError(null)
+                    setMediaPool([])
                   }}
                 >
                   ← Start over
@@ -263,9 +342,11 @@ export default function IntakeClient({
                 batchId={waResult.batchId}
                 listings={waResult.listings}
                 brokers={brokers}
+                mediaPool={mediaPool}
                 onCommitted={(summary) => {
                   setWaResult(null)
                   setText('')
+                  setMediaPool([])
                   setWaSuccess(summary)
                   router.refresh()
                 }}

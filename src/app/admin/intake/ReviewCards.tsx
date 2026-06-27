@@ -31,16 +31,27 @@ export default function ReviewCards({
   batchId,
   listings,
   brokers,
+  mediaPool = [],
   onCommitted,
 }: {
   batchId: string
   listings: ParsedListing[]
   brokers: BrokerOption[]
+  mediaPool?: string[]
   onCommitted: (result: { count: number; published: boolean }) => void
 }) {
-  const [items, setItems] = useState<CardItem[]>(() =>
-    listings.map((l) => ({ include: (l.aiConfidence ?? 0) >= 0.5, data: l, images: [], videos: [] }))
-  )
+  const [items, setItems] = useState<CardItem[]>(() => {
+    // Distribute pool URLs to listings in order by mediaCount
+    let poolIdx = 0
+    return listings.map((l) => {
+      const count = l.mediaCount ?? 0
+      const slice = mediaPool.slice(poolIdx, poolIdx + count)
+      poolIdx += count
+      const images = slice.filter((u) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(u))
+      const videos = slice.filter((u) => /\.(mp4|mov|webm)(\?|$)/i.test(u))
+      return { include: (l.aiConfidence ?? 0) >= 0.5, data: l, images, videos }
+    })
+  })
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null)
   const defaultBroker = brokers.find((b) => b.role === 'ADMIN') ?? brokers[0]
   const [postedById, setPostedById] = useState(defaultBroker?.id ?? '')
