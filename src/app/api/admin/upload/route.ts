@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { uploadToAzure } from '@/lib/azure-storage'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-// POST /api/admin/upload (multipart: files[]) -> { urls: string[] }
-// Saves listing photos/videos under /public/uploads and returns public URLs.
-// NOTE: local/self-host filesystem persistence. On serverless (Vercel) swap for
-// blob storage (S3/Vercel Blob) — the rest of the app only stores the URL.
+// POST /api/admin/upload (multipart: files[] or file) -> { urls: string[] }
+// Uploads listing photos/videos to Azure Blob Storage and returns public URLs.
 const ALLOWED = /\.(jpe?g|png|webp|gif|mp4|mov|webm)$/i
+const MIME: Record<string, string> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.webp': 'image/webp', '.gif': 'image/gif',
+  '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
+}
 
 export async function POST(req: Request) {
   let files: File[] = []
@@ -25,19 +28,15 @@ export async function POST(req: Request) {
   }
   if (files.length === 0) return NextResponse.json({ error: 'No files uploaded.' }, { status: 400 })
 
-  const dir = path.join(process.cwd(), 'public', 'uploads')
-  await mkdir(dir, { recursive: true })
-
   const urls: string[] = []
-  let seq = 0
   for (const file of files) {
     if (!ALLOWED.test(file.name)) continue
-    if (file.size > 60_000_000) continue // 60MB cap (videos)
+    if (file.size > 60_000_000) continue
     const ext = path.extname(file.name).toLowerCase()
-    const safe = `${Date.now().toString(36)}-${(seq++).toString(36)}${ext}`
+    const contentType = MIME[ext] ?? 'application/octet-stream'
     const buf = Buffer.from(await file.arrayBuffer())
-    await writeFile(path.join(dir, safe), buf)
-    urls.push(`/uploads/${safe}`)
+    const url = await uploadToAzure(buf, file.name, contentType)
+    urls.push(url)
   }
   if (urls.length === 0) return NextResponse.json({ error: 'No supported files (use jpg/png/webp/mp4/mov).' }, { status: 400 })
   return NextResponse.json({ urls })
