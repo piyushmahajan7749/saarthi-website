@@ -112,14 +112,55 @@ export default function IntakeClient({
   const router = useRouter()
   const [tab, setTab] = useState<TabKey>('whatsapp')
 
-  // ---- Tab 1: WhatsApp paste ----
-  const [text, setText] = useState('')
-  const [waParsing, setWaParsing] = useState(false)
+  // ---- Tab 1: WhatsApp ----
+  type WaMode = 'zip' | 'paste'
+  const [waMode, setWaMode] = useState<WaMode>('zip')
   const [waError, setWaError] = useState<string | null>(null)
   const [waResult, setWaResult] = useState<ParseResult | null>(null)
   const [waSuccess, setWaSuccess] = useState<CommitSummary | null>(null)
+  // Per-listing media arrays (exact match from zip, or order-based from paste+pool)
+  const [preloadedMedia, setPreloadedMedia] = useState<string[][]>([])
 
-  // Media pool: uploaded before parsing so they can be auto-distributed to listings
+  function resetWa() {
+    setWaResult(null)
+    setWaError(null)
+    setPreloadedMedia([])
+  }
+
+  // ---- Sub-mode A: ZIP upload ----
+  const [zipDragOver, setZipDragOver] = useState(false)
+  const [zipParsing, setZipParsing] = useState(false)
+
+  async function handleZip(file: File) {
+    if (zipParsing) return
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      setWaError('Please upload a .zip file from WhatsApp "Export Chat > Attach Media".')
+      return
+    }
+    setZipParsing(true)
+    setWaError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/intake/parse-wa-zip', { method: 'POST', body: fd })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Failed to process zip.')
+      if (!Array.isArray(json.listings) || json.listings.length === 0) {
+        setWaError('No listings found in the chat. Check the export has actual listing messages.')
+        return
+      }
+      setPreloadedMedia(json.mediaByListing ?? [])
+      setWaResult({ batchId: json.batchId, listings: json.listings })
+    } catch (e) {
+      setWaError(e instanceof Error ? e.message : 'Something went wrong — please try again.')
+    } finally {
+      setZipParsing(false)
+    }
+  }
+
+  // ---- Sub-mode B: Paste text + optional media pool ----
+  const [text, setText] = useState('')
+  const [textParsing, setTextParsing] = useState(false)
   const [mediaPool, setMediaPool] = useState<string[]>([])
   const [mediaUploading, setMediaUploading] = useState(false)
   const [mediaDragOver, setMediaDragOver] = useState(false)
@@ -136,17 +177,16 @@ export default function IntakeClient({
       if (!res.ok) throw new Error(json.error || 'Upload failed')
       setMediaPool((prev) => [...prev, ...(json.urls ?? [])])
     } catch {
-      // non-fatal — user can attach per card if this fails
+      // non-fatal — user can still attach per card
     } finally {
       setMediaUploading(false)
     }
   }
 
   async function parseText() {
-    if (!text.trim() || waParsing) return
-    setWaParsing(true)
+    if (!text.trim() || textParsing) return
+    setTextParsing(true)
     setWaError(null)
-    setWaSuccess(null)
     try {
       const res = await fetch('/api/admin/intake/parse-text', {
         method: 'POST',
@@ -156,14 +196,23 @@ export default function IntakeClient({
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'Parsing failed — please try again.')
       if (!Array.isArray(json.listings) || json.listings.length === 0) {
-        setWaError('No listings found in that text — sirf chatter tha shayad. Try pasting actual listing messages.')
+        setWaError('No listings found — try pasting actual listing messages.')
         return
       }
+      // Distribute pool by mediaCount order (best-effort; user can reassign per card)
+      let poolIdx = 0
+      const distributed: string[][] = json.listings.map((l: { mediaCount?: number }) => {
+        const count = l.mediaCount ?? 0
+        const slice = mediaPool.slice(poolIdx, poolIdx + count)
+        poolIdx += count
+        return slice
+      })
+      setPreloadedMedia(distributed)
       setWaResult({ batchId: json.batchId, listings: json.listings })
     } catch (e) {
       setWaError(e instanceof Error ? e.message : 'Something went wrong — please try again.')
     } finally {
-      setWaParsing(false)
+      setTextParsing(false)
     }
   }
 
@@ -228,7 +277,7 @@ export default function IntakeClient({
     <div>
       <div className="tabs" style={{ marginBottom: '1.6rem', flexWrap: 'wrap' }}>
         <button className={`tab ${tab === 'whatsapp' ? 'active' : ''}`} onClick={() => setTab('whatsapp')}>
-          📱 WhatsApp paste
+          📱 WhatsApp import
         </button>
         <button className={`tab ${tab === 'excel' ? 'active' : ''}`} onClick={() => setTab('excel')}>
           📊 Excel upload
@@ -241,110 +290,169 @@ export default function IntakeClient({
         </button>
       </div>
 
-      {/* ============ Tab 1: WhatsApp paste ============ */}
+      {/* ============ Tab 1: WhatsApp ============ */}
       {tab === 'whatsapp' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           {waSuccess && <SuccessNote summary={waSuccess} onDismiss={() => setWaSuccess(null)} />}
+
           {!waResult && (
-            <div className="card">
-              <div className="field">
-                <span className="label">Raw WhatsApp text</span>
-                <textarea
-                  className="textarea"
-                  rows={12}
-                  placeholder={WA_PLACEHOLDER}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                />
-                <span className="hint">
-                  Paste an exported chat or any jumble of listing messages — Saarthi AI splits and structures them.
-                </span>
-              </div>
-
-              {/* Media pool — optional, upload before parsing */}
-              <div className="field" style={{ marginTop: '0.8rem' }}>
-                <span className="label">
-                  Photos &amp; videos{' '}
-                  <span className="hint" style={{ fontWeight: 400 }}>— optional, from WhatsApp export</span>
-                </span>
-                <label
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '1.1rem 1.4rem',
-                    border: `1.5px dashed ${mediaDragOver ? 'var(--o)' : 'rgba(200,96,26,0.28)'}`,
-                    borderRadius: 12,
-                    background: mediaDragOver ? 'rgba(200,96,26,0.06)' : 'rgba(0,0,0,0.15)',
-                    cursor: mediaUploading ? 'default' : 'pointer',
-                    transition: 'all 0.18s',
-                    textAlign: 'center',
-                  }}
-                  onDragOver={(e) => { e.preventDefault(); setMediaDragOver(true) }}
-                  onDragLeave={() => setMediaDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setMediaDragOver(false)
-                    if (!mediaUploading && e.dataTransfer.files.length) uploadMediaPool(e.dataTransfer.files)
-                  }}
+            <>
+              {/* Mode switcher */}
+              <div className="tabs" style={{ padding: 3 }}>
+                <button
+                  className={`tab ${waMode === 'zip' ? 'active' : ''}`}
+                  style={{ padding: '0.45rem 1.2rem' }}
+                  onClick={() => { setWaMode('zip'); setWaError(null) }}
                 >
-                  <span style={{ fontSize: 22 }}>{mediaUploading ? '⏳' : '📸'}</span>
-                  <span className="hint">
-                    {mediaUploading
-                      ? `Uploading ${mediaPool.length > 0 ? `(${mediaPool.length} done…)` : '…'}`
-                      : mediaPool.length > 0
-                      ? `${mediaPool.length} file${mediaPool.length === 1 ? '' : 's'} ready — drop more or parse`
-                      : 'Drop images/videos here — auto-distributed to listings on parse'}
-                  </span>
-                  <input
-                    type="file" accept="image/*,video/*" multiple hidden
-                    disabled={mediaUploading}
-                    onChange={(e) => { if (e.target.files?.length) uploadMediaPool(e.target.files); e.currentTarget.value = '' }}
-                  />
-                </label>
-                {mediaPool.length > 0 && (
-                  <div className="chips" style={{ marginTop: 8 }}>
-                    {mediaPool.map((u) => (
-                      <span key={u} className="chip on" style={{ fontSize: 12 }}>
-                        🖼 {u.split('/').pop()?.split('-').slice(1).join('-') || u.split('/').pop()}
-                        <button onClick={() => setMediaPool((p) => p.filter((x) => x !== u))}>✕</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                  📦 Upload ZIP export
+                </button>
+                <button
+                  className={`tab ${waMode === 'paste' ? 'active' : ''}`}
+                  style={{ padding: '0.45rem 1.2rem' }}
+                  onClick={() => { setWaMode('paste'); setWaError(null) }}
+                >
+                  ✍️ Paste text
+                </button>
               </div>
 
-              <div className="row" style={{ marginTop: '1rem' }}>
-                <button className="btn btn-solid" disabled={!text.trim() || waParsing || mediaUploading} onClick={parseText}>
-                  {waParsing ? 'Parsing…' : 'Parse with AI ✦'}
-                </button>
-                {waError && <span className="error-text">{waError}</span>}
-              </div>
-            </div>
+              {/* ---- Mode A: ZIP ---- */}
+              {waMode === 'zip' && (
+                <div className="card">
+                  <label
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '3rem 2rem',
+                      border: `1.5px dashed ${zipDragOver ? 'var(--o)' : 'rgba(200,96,26,0.35)'}`,
+                      borderRadius: 14,
+                      background: zipDragOver ? 'rgba(200,96,26,0.06)' : 'rgba(0,0,0,0.12)',
+                      cursor: zipParsing ? 'default' : 'pointer',
+                      transition: 'all 0.18s',
+                      textAlign: 'center',
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setZipDragOver(true) }}
+                    onDragLeave={() => setZipDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setZipDragOver(false)
+                      const f = e.dataTransfer.files?.[0]
+                      if (f) handleZip(f)
+                    }}
+                  >
+                    <span style={{ fontSize: 40 }}>{zipParsing ? '⏳' : '📦'}</span>
+                    <span style={{ fontWeight: 500, color: 'var(--cream)', fontSize: 15 }}>
+                      {zipParsing ? 'Uploading & parsing…' : 'Drop your WhatsApp export .zip here'}
+                    </span>
+                    <span className="hint" style={{ maxWidth: 380 }}>
+                      Photos &amp; videos are matched to the right listing by filename — no guessing.
+                      <br />
+                      On WhatsApp: <strong>group → ⋮ → Export Chat → Attach Media</strong>
+                    </span>
+                    <input
+                      type="file" accept=".zip" hidden
+                      disabled={zipParsing}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleZip(f)
+                        e.currentTarget.value = ''
+                      }}
+                    />
+                  </label>
+                  {waError && <p className="error-text" style={{ marginTop: 10 }}>{waError}</p>}
+                </div>
+              )}
+
+              {/* ---- Mode B: Paste text ---- */}
+              {waMode === 'paste' && (
+                <div className="card">
+                  <div className="field">
+                    <span className="label">Raw WhatsApp text</span>
+                    <textarea
+                      className="textarea"
+                      rows={12}
+                      placeholder={WA_PLACEHOLDER}
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                    />
+                    <span className="hint">
+                      Paste the <code>_chat.txt</code> or any broker messages — AI splits and structures them.
+                    </span>
+                  </div>
+
+                  <div className="field" style={{ marginTop: '0.8rem' }}>
+                    <span className="label">
+                      Photos &amp; videos{' '}
+                      <span className="hint" style={{ fontWeight: 400 }}>— optional, distributed in order</span>
+                    </span>
+                    <label
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                        padding: '1.1rem 1.4rem',
+                        border: `1.5px dashed ${mediaDragOver ? 'var(--o)' : 'rgba(200,96,26,0.28)'}`,
+                        borderRadius: 12,
+                        background: mediaDragOver ? 'rgba(200,96,26,0.06)' : 'rgba(0,0,0,0.15)',
+                        cursor: mediaUploading ? 'default' : 'pointer',
+                        transition: 'all 0.18s', textAlign: 'center',
+                      }}
+                      onDragOver={(e) => { e.preventDefault(); setMediaDragOver(true) }}
+                      onDragLeave={() => setMediaDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault(); setMediaDragOver(false)
+                        if (!mediaUploading && e.dataTransfer.files.length) uploadMediaPool(e.dataTransfer.files)
+                      }}
+                    >
+                      <span style={{ fontSize: 22 }}>{mediaUploading ? '⏳' : '📸'}</span>
+                      <span className="hint">
+                        {mediaUploading
+                          ? `Uploading… (${mediaPool.length} done)`
+                          : mediaPool.length > 0
+                          ? `${mediaPool.length} file${mediaPool.length === 1 ? '' : 's'} ready`
+                          : 'Drop images/videos here'}
+                      </span>
+                      <input
+                        type="file" accept="image/*,video/*" multiple hidden
+                        disabled={mediaUploading}
+                        onChange={(e) => { if (e.target.files?.length) uploadMediaPool(e.target.files); e.currentTarget.value = '' }}
+                      />
+                    </label>
+                    {mediaPool.length > 0 && (
+                      <div className="chips" style={{ marginTop: 8 }}>
+                        {mediaPool.map((u) => (
+                          <span key={u} className="chip on" style={{ fontSize: 12 }}>
+                            🖼 {u.split('/').pop()?.split('-').slice(1).join('-') || u.split('/').pop()}
+                            <button onClick={() => setMediaPool((p) => p.filter((x) => x !== u))}>✕</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="row" style={{ marginTop: '1rem' }}>
+                    <button className="btn btn-solid" disabled={!text.trim() || textParsing || mediaUploading} onClick={parseText}>
+                      {textParsing ? 'Parsing…' : 'Parse with AI ✦'}
+                    </button>
+                    {waError && <span className="error-text">{waError}</span>}
+                  </div>
+                </div>
+              )}
+            </>
           )}
+
           {waResult && (
             <>
               <div className="row">
-                <button
-                  className="btn btn-quiet btn-sm"
-                  onClick={() => {
-                    setWaResult(null)
-                    setWaError(null)
-                    setMediaPool([])
-                  }}
-                >
-                  ← Start over
-                </button>
+                <button className="btn btn-quiet btn-sm" onClick={resetWa}>← Start over</button>
               </div>
               <ReviewCards
                 key={waResult.batchId}
                 batchId={waResult.batchId}
                 listings={waResult.listings}
                 brokers={brokers}
-                mediaPool={mediaPool}
+                preloadedMedia={preloadedMedia}
                 onCommitted={(summary) => {
-                  setWaResult(null)
+                  resetWa()
                   setText('')
                   setMediaPool([])
                   setWaSuccess(summary)
