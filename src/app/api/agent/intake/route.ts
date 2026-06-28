@@ -5,7 +5,7 @@ import { parseListingsFromText } from '@/lib/ai'
 import type { ParsedListing } from '@/types'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 // POST /api/agent/intake
 // Called by cx-agent when a broker posts a listing in the WhatsApp group.

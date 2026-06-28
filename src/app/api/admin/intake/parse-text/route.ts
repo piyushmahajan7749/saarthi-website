@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth'
 import { parseListingsFromText } from '@/lib/ai'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // AI parsing of long chats can take a while
+export const maxDuration = 300 // GPT-5.5 multi-agent parsing of long chats can take a while
 
 // POST /api/admin/intake/parse-text { text } -> { batchId, listings: ParsedListing[] }
 export async function POST(req: Request) {

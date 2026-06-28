@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth'
 import { parseListingsFromRows } from '@/lib/ai'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 // POST /api/admin/intake/parse-excel (multipart: file) -> { batchId, listings }
 export async function POST(req: Request) {

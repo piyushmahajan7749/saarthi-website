@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { transcribeAudio, transcriptionConfigured } from '@/lib/transcription'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 // POST /api/admin/transcribe (multipart: audio) -> { text }
 export async function POST(req: Request) {

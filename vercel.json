@@ -5,5 +5,38 @@
       "path": "/api/cron/automations",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), geolocation=(), microphone=(self)"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400" }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400" }
+      ]
+    }
+  ],
+  "functions": {
+    "src/app/api/admin/intake/parse-text/route.ts": { "maxDuration": 300 },
+    "src/app/api/admin/intake/parse-wa-zip/route.ts": { "maxDuration": 300 },
+    "src/app/api/admin/intake/parse-excel/route.ts": { "maxDuration": 300 },
+    "src/app/api/admin/transcribe/route.ts": { "maxDuration": 300 },
+    "src/app/api/agent/intake/route.ts": { "maxDuration": 300 }
+  }
 }

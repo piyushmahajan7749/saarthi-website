@@ -6,7 +6,7 @@ import { parseListingsFromText } from '@/lib/ai'
 import { uploadToAzure } from '@/lib/azure-storage'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 // POST /api/admin/intake/parse-wa-zip  (multipart: file = .zip)
 // -> { batchId, listings: ParsedListing[], mediaByListing: string[][] }
