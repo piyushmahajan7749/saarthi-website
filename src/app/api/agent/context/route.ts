@@ -85,6 +85,8 @@ export async function POST(req: Request) {
       priceLabel: formatPrice(m.property.price, m.property.listingFor),
       locality: m.property.locality,
       url: propertyUrl(m.propertyId),
+      imageUrl: safeJsonParse<string[]>(m.property.images, [])[0] ?? null,
+      videoUrl: safeJsonParse<string[]>(m.property.videos, [])[0] ?? null,
       sentAt: m.sentAt.toISOString(),
     })),
     openVisit: openVisit

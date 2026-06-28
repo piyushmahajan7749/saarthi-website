@@ -38,7 +38,14 @@ export async function sendWhatsAppText(toPhone: string, text: string): Promise<b
 }
 
 export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
+  // Prefer an explicit, real URL; otherwise use Vercel's automatic production
+  // domain so Agent-API links are never localhost in prod even if the env var
+  // isn't set. Falls back to localhost only in local dev.
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL
+  if (explicit && !explicit.includes('localhost')) return explicit.replace(/\/$/, '')
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+  return (explicit || 'http://localhost:3000').replace(/\/$/, '')
 }
 
 export function propertyUrl(propertyId: string): string {
