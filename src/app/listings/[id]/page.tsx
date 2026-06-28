@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import PropertyCard, { mediaGradient, typeIcon } from '@/components/PropertyCard'
 import ChatWidget from '@/components/ChatWidget'
 import WhatsAppFloat from '@/components/WhatsAppFloat'
+import MediaCarousel, { type MediaItem } from '@/components/MediaCarousel'
 
 export const dynamic = 'force-dynamic'
 const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
@@ -47,7 +48,10 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
   }
   const similar = await db.property.findMany({ where: similarWhere, take: 3, orderBy: { featured: 'desc' } })
 
-  const tiles = [0, 1, 2]
+  const media: MediaItem[] = [
+    ...images.map((src) => ({ type: 'image' as const, src })),
+    ...videos.map((src) => ({ type: 'video' as const, src })),
+  ]
   const waText = `Hi Saarthi! I'm interested in: ${property.title} (${SITE}/listings/${property.id})`
 
   return (
@@ -64,27 +68,27 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
             </div>
           )}
 
-          {/* gallery */}
-          <div className="gallery">
-            <div className="gallery-main" style={{ position: 'relative' }}>
-              {images[0]
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={images[0]} alt={property.title} />
-                : <div className="ph" style={{ background: mediaGradient(property.id) }}><span style={{ fontSize: 64 }}>{typeIcon(property.type)}</span></div>}
-              <div className="prop-badges">
-                <span className={`badge ${property.listingFor === 'RENT' ? 'badge-teal' : 'badge-orange'}`}>For {property.listingFor === 'RENT' ? 'Rent' : 'Sale'}</span>
-                {property.featured && <span className="badge badge-gold">★ Featured</span>}
+          {/* media carousel (photos + videos) */}
+          {media.length > 0 ? (
+            <MediaCarousel media={media} title={property.title} listingFor={property.listingFor} featured={property.featured} />
+          ) : (
+            <div className="gallery">
+              <div className="gallery-main" style={{ position: 'relative' }}>
+                <div className="ph" style={{ background: mediaGradient(property.id) }}><span style={{ fontSize: 64 }}>{typeIcon(property.type)}</span></div>
+                <div className="prop-badges">
+                  <span className={`badge ${property.listingFor === 'RENT' ? 'badge-teal' : 'badge-orange'}`}>For {property.listingFor === 'RENT' ? 'Rent' : 'Sale'}</span>
+                  {property.featured && <span className="badge badge-gold">★ Featured</span>}
+                </div>
+              </div>
+              <div className="gallery-side">
+                {[1, 2].map((i) => (
+                  <div key={i} className="ph" style={{ background: mediaGradient(property.id + i) }}>
+                    <span style={{ fontSize: 34, opacity: 0.7 }}>{typeIcon(property.type)}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="gallery-side">
-              {tiles.slice(1).map((i) => (
-                <div key={i} className="ph" style={images[i] ? undefined : { background: mediaGradient(property.id + i) }}>
-                  {images[i]
-                    ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={images[i]} alt={`${property.title} ${i}`} />
-                    : <span style={{ fontSize: 34, opacity: 0.7 }}>{typeIcon(property.type)}</span>}
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* header + 2-col body */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem', marginTop: '1.8rem', alignItems: 'start' }} className="detail-grid">
@@ -123,18 +127,6 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
                   <h2 className="section-eyebrow" style={{ color: 'var(--o)' }}>Amenities</h2>
                   <div className="chips" style={{ marginTop: 10 }}>
                     {amenities.map((a) => <span key={a} className="chip" style={{ cursor: 'default' }}>{a}</span>)}
-                  </div>
-                </div>
-              )}
-
-              {videos.length > 0 && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <h2 className="section-eyebrow" style={{ color: 'var(--o)' }}>Video walkthrough</h2>
-                  <div style={{ display: 'grid', gridTemplateColumns: videos.length > 1 ? '1fr 1fr' : '1fr', gap: 12, marginTop: 10 }}>
-                    {videos.map((src) => (
-                      // eslint-disable-next-line jsx-a11y/media-has-caption
-                      <video key={src} src={src} controls preload="metadata" style={{ width: '100%', borderRadius: 14, background: '#000', aspectRatio: '16/10' }} />
-                    ))}
                   </div>
                 </div>
               )}
