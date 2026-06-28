@@ -71,11 +71,17 @@ export default function ChatWidget() {
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
   const loadedRef = useRef(false)
+  const sidRef = useRef<string | null>(null)
   const msgsRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Restore conversation once on mount.
+  // Restore conversation + session id once on mount.
   useEffect(() => {
+    try {
+      sidRef.current = localStorage.getItem('saarthi_chat_sid')
+    } catch {
+      /* storage unavailable */
+    }
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY)
       if (raw) {
@@ -114,11 +120,6 @@ export default function ChatWidget() {
     const text = input.trim()
     if (!text || pending) return
 
-    const history = messages
-      .filter((m) => m.content)
-      .slice(-12)
-      .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
-
     setMessages((cur) => [...cur, { role: 'user', content: text }])
     setInput('')
     setPending(true)
@@ -127,10 +128,14 @@ export default function ChatWidget() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ message: text, sessionId: sidRef.current }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as { reply?: string; properties?: ChatProperty[] }
+      const data = (await res.json()) as { reply?: string; properties?: ChatProperty[]; sessionId?: string }
+      if (data.sessionId && data.sessionId !== sidRef.current) {
+        sidRef.current = data.sessionId
+        try { localStorage.setItem('saarthi_chat_sid', data.sessionId) } catch { /* non-fatal */ }
+      }
       setMessages((cur) => [
         ...cur,
         {

@@ -8,7 +8,6 @@ import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import PropertyCard from '@/components/PropertyCard'
 import ChatWidget from '@/components/ChatWidget'
-import WhatsAppFloat from '@/components/WhatsAppFloat'
 import SearchControls from './SearchControls'
 import type { PropertyFilters, PropertyType, ListingFor } from '@/types'
 
@@ -16,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Browse properties in Indore — Saarthi' }
 
 const PAGE_SIZE = 12
-const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
+const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919630707498'
 
 type SP = {
   q?: string; for?: string; type?: string; bhk?: string
@@ -162,7 +161,6 @@ export default async function ListingsPage({ searchParams }: { searchParams: SP 
         </div>
       </div>
       <Footer />
-      <WhatsAppFloat />
       <ChatWidget />
     </>
   )

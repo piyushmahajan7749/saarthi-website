@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
+const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919630707498'
 
 export default function Nav() {
   const pathname = usePathname()

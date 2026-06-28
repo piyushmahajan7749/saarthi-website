@@ -7,11 +7,10 @@ import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import PropertyCard, { mediaGradient, typeIcon } from '@/components/PropertyCard'
 import ChatWidget from '@/components/ChatWidget'
-import WhatsAppFloat from '@/components/WhatsAppFloat'
 import MediaCarousel, { type MediaItem } from '@/components/MediaCarousel'
 
 export const dynamic = 'force-dynamic'
-const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
+const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919630707498'
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
@@ -167,7 +166,6 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
         </div>
       </div>
       <Footer />
-      <WhatsAppFloat text={waText} />
       <ChatWidget />
     </>
   )

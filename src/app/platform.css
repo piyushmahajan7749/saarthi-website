@@ -199,7 +199,7 @@
 
 /* ---------- media carousel ---------- */
 .carousel { display: flex; flex-direction: column; gap: 10px; }
-.carousel-stage { position: relative; aspect-ratio: 16/10; border-radius: 20px; overflow: hidden; background: #0c0a09; }
+.carousel-stage { position: relative; aspect-ratio: 16/10; max-height: 460px; border-radius: 20px; overflow: hidden; background: #0c0a09; }
 .carousel-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .carousel-stage video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
 .carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 26px; line-height: 1; color: var(--cream); background: rgba(12, 10, 9, 0.55); backdrop-filter: blur(4px); transition: background 0.18s, transform 0.18s; }

@@ -119,10 +119,16 @@ export async function handleInboundLeadMessage(args: {
   text: string
   profileName?: string | null
   deliver?: boolean
+  channel?: 'WHATSAPP' | 'WEBSITE'
 }): Promise<InboundResult> {
   const { phone, text, profileName } = args
   const deliver = args.deliver ?? true
-  const cleanPhone = phone.replace(/\D/g, '')
+  const channel = args.channel ?? 'WHATSAPP'
+  const isWeb = channel === 'WEBSITE'
+  const msgChannel = isWeb ? 'WEBCHAT' : 'WHATSAPP'
+  // Web chat sessions key the lead by an opaque session id (e.g. "web:uuid");
+  // WhatsApp keys by the sender's digits.
+  const cleanPhone = isWeb ? phone : phone.replace(/\D/g, '')
   const now = new Date()
   const { todayLabel, tomorrowISO } = todayContextIST(now)
 
@@ -130,10 +136,10 @@ export async function handleInboundLeadMessage(args: {
   let lead = await db.lead.findUnique({ where: { phone: cleanPhone } })
   const isNew = !lead
   if (!lead) {
-    lead = await db.lead.create({ data: { phone: cleanPhone, name: profileName ?? null, source: 'WHATSAPP', status: 'NEW' } })
-    await db.activity.create({ data: { type: 'LEAD_CREATED', description: `New WhatsApp lead from +${cleanPhone}`, leadId: lead.id } })
+    lead = await db.lead.create({ data: { phone: cleanPhone, name: profileName ?? null, source: isWeb ? 'WEBSITE' : 'WHATSAPP', status: 'NEW' } })
+    await db.activity.create({ data: { type: 'LEAD_CREATED', description: isWeb ? 'New website chat lead' : `New WhatsApp lead from +${cleanPhone}`, leadId: lead.id } })
   }
-  await db.message.create({ data: { leadId: lead.id, direction: 'INBOUND', channel: 'WHATSAPP', content: text } })
+  await db.message.create({ data: { leadId: lead.id, direction: 'INBOUND', channel: msgChannel, content: text } })
 
   if (['CLOSED', 'LOST'].includes(lead.status)) {
     return { leadId: lead.id, replies: [], status: lead.status, brokerAlert: null }
@@ -235,7 +241,7 @@ export async function handleInboundLeadMessage(args: {
   // 6. Store + deliver replies
   for (const r of replies) {
     if (!r.startsWith('[MATCHES SENT')) {
-      await db.message.create({ data: { leadId: lead.id, direction: 'OUTBOUND', channel: 'WHATSAPP', content: r } })
+      await db.message.create({ data: { leadId: lead.id, direction: 'OUTBOUND', channel: msgChannel, content: r } })
     }
     if (deliver) await sendWhatsAppText(cleanPhone, r)
   }

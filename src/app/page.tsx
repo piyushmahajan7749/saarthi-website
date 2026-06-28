@@ -3,14 +3,13 @@ import type { Property } from '@prisma/client'
 import { db } from '@/lib/db'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
-import WhatsAppFloat from '@/components/WhatsAppFloat'
 import ChatWidget from '@/components/ChatWidget'
 import PropertyCard from '@/components/PropertyCard'
 import { ScrollReveal, HeroSearch } from './HomeClient'
 
 export const dynamic = 'force-dynamic'
 
-const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919826078459'
+const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919630707498'
 
 function PhoneIcon({ size = 16 }: { size?: number }) {
   return (
@@ -445,7 +444,6 @@ export default async function Home() {
       </section>
 
       <Footer />
-      <WhatsAppFloat text="Hi Saarthi! I'm looking for a property in Indore." />
       <ChatWidget />
     </>
   )

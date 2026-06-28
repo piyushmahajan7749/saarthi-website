@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import ChatWidget from '@/components/ChatWidget'
-import WhatsAppFloat from '@/components/WhatsAppFloat'
 import PostPropertyForm from './PostPropertyForm'
 
 export const metadata: Metadata = {
@@ -27,7 +26,6 @@ export default function PostPropertyPage() {
         </div>
       </main>
       <Footer />
-      <WhatsAppFloat text="Hi Saarthi! I want to list my property." />
       <ChatWidget />
     </>
   )
