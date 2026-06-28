@@ -118,8 +118,8 @@
 .admin-user { padding: 1rem 1.2rem; border-top: 1px solid rgba(200, 96, 26, 0.1); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .admin-user-name { font-size: 13px; color: var(--cream); font-weight: 500; }
 .admin-user-role { font-size: 10.5px; color: var(--muted); text-transform: capitalize; }
-.admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.admin-content { padding: 2rem 2.2rem 4rem; flex: 1; }
+.admin-main { flex: 1; min-width: 0; }
+.admin-content { padding: 2rem 2.2rem 4rem; }
 .admin-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 600; color: var(--cream); letter-spacing: -0.5px; }
 .admin-sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
 

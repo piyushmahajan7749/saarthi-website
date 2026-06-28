@@ -87,10 +87,11 @@ Rules:
 - postedByName = the chat sender who posted the listing (e.g. "Rajan Verma"). This is who to credit/contact, distinct from the property owner.
 - mediaCount = number of photos/videos attached to that message ("<Media omitted>", "file attached", IMG-/VID- references).
 - Convert Indian price formats: "75L"/"75 lakh" = 7500000, "1.2cr" = 12000000. Rent amounts are per month.
-- Hinglish is common ("makaan", "bechna hai", "kiraya") — interpret it.
+- Rent price sanity: residential rent in Indore ranges ₹4,000–₹1,50,000/month. If the extracted rent price exceeds ₹3,00,000 it is almost certainly a SALE price — either reclassify as SALE or set price=null and flag in aiNotes.
+- Hinglish is common ("makaan", "bechna hai", "kiraya", "rent pe") — interpret it.
 - Skip chatter that is not a property listing (greetings, questions, requirement posts like "chahiye"/"required"/"looking for").
 - If a message is a REQUIREMENT (someone looking to buy/rent) and not an inventory listing, skip it.
-- aiNotes must flag: missing price/locality/contact, suspicious pricing for the locality, and note if photos/videos are attached (admin should download & attach them).
+- aiNotes must flag: missing price/locality/contact, suspicious pricing for the locality, price that looks like a sale amount on a RENT listing, and note if photos/videos are attached (admin should download & attach them).
 - Never invent data. Use null for unknown fields. Keep rawText verbatim per listing.`
 
 export async function parseListingsFromText(raw: string): Promise<ParsedListing[]> {
