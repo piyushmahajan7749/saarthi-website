@@ -53,10 +53,24 @@ export async function POST(req: Request) {
     db.visit.findFirst({ where: { leadId: lead.id, status: { in: ['PROPOSED', 'TENTATIVE', 'CONFIRMED'] } }, orderBy: { createdAt: 'desc' } }),
   ])
 
+  // Durable conversation transcript — the bot reloads this every turn so it
+  // never re-asks what was already discussed, even if its own short-term memory
+  // was reset (container restart, scale event, etc.). Newest 16, oldest-first.
+  const recent = await db.message.findMany({
+    where: { leadId: lead.id, channel: { not: 'SYSTEM' } },
+    orderBy: { createdAt: 'desc' },
+    take: 16,
+    select: { direction: true, content: true },
+  })
+  const transcript = recent
+    .reverse()
+    .map((m) => ({ role: m.direction === 'INBOUND' ? 'user' : 'bot', content: m.content }))
+
   const { todayLabel, tomorrowISO } = todayContextIST(new Date())
   const requirements = safeJsonParse<LeadRequirements>(lead.requirements, {})
 
   return NextResponse.json({
+    transcript,
     leadId: lead.id,
     isNew,
     name: lead.name,
