@@ -10,6 +10,7 @@ import {
   splitWhatsAppChatBlocks,
   parsePriceToken,
 } from './heuristics'
+import { azureEnabled, azureChatJSON, mapLimit } from './azure-openai'
 
 const MODEL = process.env.AI_MODEL || 'claude-opus-4-8'
 
@@ -94,39 +95,184 @@ Rules:
 - aiNotes must flag: missing price/locality/contact, suspicious pricing for the locality, price that looks like a sale amount on a RENT listing, and note if photos/videos are attached (admin should download & attach them).
 - Never invent data. Use null for unknown fields. Keep rawText verbatim per listing.`
 
+// ---- Multi-agent listing pipeline (Azure OpenAI / GPT-5.5) -----------------
+// Three specialised passes for accuracy:
+//   1. Segmenter — split the raw chat into distinct listing "posts"
+//   2. Extractor — turn each post into a structured ParsedListing
+//   3. Auditor   — cross-check & correct every listing (price scale, SALE/RENT…)
+// Each pass degrades to the previous best engine if Azure is unavailable.
+
+const SEGMENT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['posts'],
+  properties: {
+    posts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['rawText', 'postedByName', 'mediaCount'],
+        properties: {
+          rawText: { type: 'string', description: 'VERBATIM text of this one listing, including any media filename / "<Media omitted>" / "(file attached)" lines exactly as written.' },
+          postedByName: { type: ['string', 'null'], description: 'WhatsApp sender who posted it, e.g. "Rajan Verma". Null if unknown.' },
+          mediaCount: { type: 'integer', description: 'Count of photos/videos attached to this listing ("<Media omitted>", "file attached", IMG-/VID- references).' },
+        },
+      },
+    },
+  },
+} as const
+
+interface SegmentedPost { rawText: string; postedByName: string | null; mediaCount: number }
+
+const SEGMENTER_SYSTEM = `You segment an exported BROKER WhatsApp group chat (Indore, India real estate) into individual PROPERTY LISTINGS.
+A single chat message may contain several listings; one listing may span several consecutive messages from the same sender. Your job is to output exactly one entry per distinct property on offer.
+Rules:
+- INCLUDE only inventory being offered (for sale or rent). EXCLUDE greetings, thanks, questions, requirement/wanted posts ("chahiye", "required", "looking for", "need"), price negotiations and general chatter.
+- Keep rawText VERBATIM — do not paraphrase, translate, or drop media reference lines (e.g. "IMG-20240608-WA0001.jpg (file attached)", "<Media omitted>"). The downstream system matches photos to listings using those exact filenames.
+- postedByName = the chat sender (left of the colon on the "DD/MM/YY, HH:MM - Name:" line), not the property owner.
+- mediaCount = number of media attachments that belong to that listing.
+- If the same property is reposted, output it once (the most complete version).`
+
+const EXTRACTOR_SYSTEM = `You are Saarthi's expert listing extractor for Indian real estate (primary market: Indore, MP). You receive an ARRAY of pre-segmented listing posts and must output one structured listing per input post, IN THE SAME ORDER (same array length).
+Extraction rules:
+- title: short, marketable, e.g. "3 BHK Flat for Sale in Vijay Nagar".
+- type: FLAT/HOUSE/VILLA/PLOT/COMMERCIAL/OFFICE/SHOP/PG. "makaan"/"bungalow"/"kothi"/"independent house" => HOUSE. "plot"/"land"/"farm"/"jameen" => PLOT.
+- listingFor: SALE or RENT. Cues for RENT: "rent", "kiraya", "lease", "per month", "/month", "pm", "rent pe". Cues for SALE: "sale", "sell", "bechna", "for sale".
+- price: ABSOLUTE rupees. Conversions: "75L"/"75 lac"/"75 lakh" => 7500000; "1.2cr"/"1.2 crore" => 12000000; "18k"/"18 hazaar" => 18000; "₹45,00,000" => 4500000. Rent is the MONTHLY figure.
+- PRICE SANITY (critical): residential RENT in Indore is ₹3,000–₹2,00,000/month. If a RENT listing's price would exceed ₹3,00,000/month it is almost certainly a SALE price stated in the message — if the post is genuinely a rental, set price=null and explain in aiNotes; if it is actually a sale, set listingFor=SALE. Never put a sale-scale number (e.g. 1,00,00,000) on a RENT listing.
+- area + areaUnit: number with unit sqft/sqyd/acre (default sqft).
+- bhk: integer (null for plots/commercial).
+- ownerName/ownerPhone: the PROPERTY owner/seller if named in the body. ownerPhone = digits with country code (prefix 91 for bare 10-digit Indian numbers). postedByName is given to you — keep it; it is the broker who posted, distinct from the owner.
+- mediaCount: keep the value provided for the post.
+- description: clean, factual 2–4 sentences rewritten from rawText (no invented amenities).
+- amenities: only those explicitly mentioned.
+- aiSummary: one-line sales pitch. aiNotes: missing fields, red flags, pricing that looks off for the locality, and a note if media is attached.
+- aiConfidence: 0..1 honest confidence.
+- rawText: copy the post's rawText VERBATIM (unchanged).
+- NEVER invent data. Use null for unknown fields.`
+
+const AUDITOR_SYSTEM = `You are a strict QA auditor for extracted Indian real-estate listings (Indore). You receive listings with their original rawText and must return the SAME listings array (same order, same length) with errors corrected.
+Check and FIX each listing against its rawText:
+- Price scale: lakh/crore/k conversions correct? "75 lakh"=7500000, "1.2cr"=12000000, "18k"=18000.
+- SALE vs RENT: does listingFor match the text? A RENT price above ₹3,00,000/month is wrong — either it is really a SALE (set listingFor=SALE) or the rent is unknown (set price=null). Never leave a sale-scale price on a RENT listing.
+- type, bhk, area/areaUnit, locality, city sane and supported by rawText?
+- owner vs poster not swapped; phone digits valid (country code, 10-digit Indian => prefix 91).
+- No hallucinated amenities/fields — strip anything not in rawText.
+Update aiNotes to describe any correction you made or any remaining gap, and set aiConfidence accordingly. Do NOT alter rawText, mediaCount, or postedByName unless they are clearly wrong. Return the corrected listings array.`
+
+const EXTRACT_CHUNK = 6 // posts per extractor call
+const AUDIT_CHUNK = 10 // listings per auditor call
+const PARSE_CONCURRENCY = 4
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+async function azureSegment(raw: string): Promise<SegmentedPost[]> {
+  const { posts } = await azureChatJSON<{ posts: SegmentedPost[] }>({
+    system: SEGMENTER_SYSTEM,
+    user: `Segment this broker WhatsApp group export into individual property listings:\n\n<chat>\n${raw.slice(0, 100_000)}\n</chat>`,
+    schema: SEGMENT_SCHEMA,
+    schemaName: 'segments',
+    maxTokens: 16_000,
+    timeoutMs: 100_000,
+  })
+  return Array.isArray(posts) ? posts : []
+}
+
+async function azureExtract(posts: SegmentedPost[]): Promise<ParsedListing[]> {
+  const chunks = chunk(posts, EXTRACT_CHUNK)
+  const results = await mapLimit(chunks, PARSE_CONCURRENCY, async (group) => {
+    const { listings } = await azureChatJSON<{ listings: ParsedListing[] }>({
+      system: EXTRACTOR_SYSTEM,
+      user: `Extract one structured listing per post (preserve order):\n\n${JSON.stringify(group, null, 1)}`,
+      schema: LISTINGS_SCHEMA,
+      schemaName: 'listings',
+      maxTokens: 12_000,
+    })
+    return Array.isArray(listings) ? listings : []
+  })
+  return results.flat()
+}
+
+async function azureAudit(listings: ParsedListing[]): Promise<ParsedListing[]> {
+  const chunks = chunk(listings, AUDIT_CHUNK)
+  const results = await mapLimit(chunks, PARSE_CONCURRENCY, async (group) => {
+    try {
+      const { listings: fixed } = await azureChatJSON<{ listings: ParsedListing[] }>({
+        system: AUDITOR_SYSTEM,
+        user: `Audit and correct these listings:\n\n${JSON.stringify(group, null, 1)}`,
+        schema: LISTINGS_SCHEMA,
+        schemaName: 'listings',
+        maxTokens: 12_000,
+      })
+      // Only accept a clean 1:1 correction; otherwise keep the originals.
+      return Array.isArray(fixed) && fixed.length === group.length ? fixed : group
+    } catch (err) {
+      console.error('[ai] audit chunk failed, keeping unaudited listings:', err)
+      return group
+    }
+  })
+  return results.flat()
+}
+
+// Legacy single-shot Claude parse — middle fallback when Azure is unavailable.
+async function claudeParse(prompt: string): Promise<ParsedListing[]> {
+  const { listings } = await structured<{ listings: ParsedListing[] }>(PARSER_SYSTEM, prompt, LISTINGS_SCHEMA)
+  return listings
+}
+
 export async function parseListingsFromText(raw: string): Promise<ParsedListing[]> {
   const heuristic = () =>
     splitWhatsAppChatBlocks(raw).map((b) => heuristicParseListing(b.text, { postedByName: b.sender, mediaCount: b.mediaCount }))
-  if (!aiEnabled()) return heuristic()
-  try {
-    const { listings } = await structured<{ listings: ParsedListing[] }>(
-      PARSER_SYSTEM,
-      `Extract all property listings from this broker WhatsApp group export:\n\n<input>\n${raw.slice(0, 60000)}\n</input>`,
-      LISTINGS_SCHEMA
-    )
-    return listings
-  } catch (err) {
-    console.error('[ai] parseListingsFromText failed, falling back to heuristics:', err)
-    return heuristic()
+
+  if (azureEnabled()) {
+    try {
+      const posts = await azureSegment(raw)
+      if (posts.length === 0) return []
+      const extracted = await azureExtract(posts)
+      return await azureAudit(extracted)
+    } catch (err) {
+      console.error('[ai] Azure listing pipeline failed, trying Claude:', err)
+    }
   }
+  if (aiEnabled()) {
+    try {
+      return await claudeParse(`Extract all property listings from this broker WhatsApp group export:\n\n<input>\n${raw.slice(0, 60000)}\n</input>`)
+    } catch (err) {
+      console.error('[ai] Claude listing parse failed, falling back to heuristics:', err)
+    }
+  }
+  return heuristic()
 }
 
 export async function parseListingsFromRows(rows: Record<string, unknown>[]): Promise<ParsedListing[]> {
-  const rowsText = rows.map((r, i) => `Row ${i + 1}: ${JSON.stringify(r)}`).join('\n')
   const rowsHeuristic = () =>
     rows.map((r) => heuristicParseListing(Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(', ')))
-  if (!aiEnabled()) return rowsHeuristic()
-  try {
-    const { listings } = await structured<{ listings: ParsedListing[] }>(
-      PARSER_SYSTEM,
-      `Each row below is one property from an Excel sheet (column names vary by broker — map them sensibly). Extract one listing per row:\n\n${rowsText.slice(0, 60000)}`,
-      LISTINGS_SCHEMA
-    )
-    return listings
-  } catch (err) {
-    console.error('[ai] parseListingsFromRows failed, falling back to heuristics:', err)
-    return rowsHeuristic()
+
+  // Each row is already one property — no segmentation needed.
+  const posts: SegmentedPost[] = rows.map((r) => ({ rawText: Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(', '), postedByName: null, mediaCount: 0 }))
+
+  if (azureEnabled()) {
+    try {
+      const extracted = await azureExtract(posts)
+      return await azureAudit(extracted)
+    } catch (err) {
+      console.error('[ai] Azure row pipeline failed, trying Claude:', err)
+    }
   }
+  if (aiEnabled()) {
+    try {
+      const rowsText = rows.map((r, i) => `Row ${i + 1}: ${JSON.stringify(r)}`).join('\n')
+      return await claudeParse(`Each row below is one property from an Excel sheet (column names vary by broker — map them sensibly). Extract one listing per row:\n\n${rowsText.slice(0, 60000)}`)
+    } catch (err) {
+      console.error('[ai] Claude row parse failed, falling back to heuristics:', err)
+    }
+  }
+  return rowsHeuristic()
 }
 
 // ---------------------------------------------------------------------------
