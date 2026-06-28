@@ -105,12 +105,20 @@
 
 /* ---------- admin shell ---------- */
 .admin-wrap { display: flex; min-height: 100vh; background: var(--ink); }
-.admin-sidebar { width: 232px; flex-shrink: 0; border-right: 1px solid rgba(200, 96, 26, 0.12); background: rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.admin-sidebar { width: 232px; flex-shrink: 0; border-right: 1px solid rgba(200, 96, 26, 0.12); background: rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; transition: width 0.22s ease; }
+.admin-sidebar.collapsed { width: 62px; }
+.admin-sidebar.collapsed .txt { display: none; }
+.admin-sidebar.collapsed .admin-logo { justify-content: center; padding: 1.2rem 0; }
+.admin-sidebar.collapsed .admin-nav a { justify-content: center; gap: 0; padding: 0.65rem 0; }
+.admin-sidebar.collapsed .admin-user { justify-content: center; }
+.sidebar-toggle { display: flex; align-items: center; background: none; border: none; cursor: pointer; color: var(--muted); padding: 0.65rem 0.9rem; border-radius: 11px; width: 100%; margin-top: 4px; transition: all 0.18s; }
+.sidebar-toggle:hover { color: var(--cream); background: rgba(253, 248, 242, 0.04); }
+.admin-sidebar.collapsed .sidebar-toggle { justify-content: center; padding: 0.65rem 0; }
 .admin-logo { display: flex; align-items: center; gap: 10px; padding: 1.4rem 1.4rem 1.2rem; border-bottom: 1px solid rgba(200, 96, 26, 0.1); }
 .admin-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 700; color: var(--cream); }
 .admin-logo-text span { color: var(--o); }
 .admin-logo-sub { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.admin-nav { display: flex; flex-direction: column; gap: 2px; padding: 1rem 0.8rem; flex: 1; }
+.admin-nav { position: static; top: auto; left: auto; right: auto; z-index: auto; align-items: stretch; justify-content: flex-start; display: flex; flex-direction: column; gap: 2px; padding: 1rem 0.8rem; flex: 1; }
 .admin-nav a { display: flex; align-items: center; gap: 11px; padding: 0.65rem 0.9rem; border-radius: 11px; color: var(--muted); text-decoration: none; font-size: 13.5px; font-weight: 450; transition: all 0.18s; }
 .admin-nav a:hover { color: var(--cream); background: rgba(253, 248, 242, 0.04); }
 .admin-nav a.active { color: var(--o3); background: rgba(200, 96, 26, 0.12); font-weight: 500; }

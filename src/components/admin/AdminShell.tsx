@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -25,6 +26,7 @@ const ICONS = {
 export default function AdminShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [collapsed, setCollapsed] = useState(false)
 
   const links = [
     { href: '/admin', label: 'Dashboard', icon: ICONS.dashboard, exact: true },
@@ -42,13 +44,13 @@ export default function AdminShell({ user, children }: { user: SessionUser; chil
 
   return (
     <div className="admin-wrap">
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar${collapsed ? ' collapsed' : ''}`}>
         <Link href="/admin" className="admin-logo" style={{ textDecoration: 'none' }}>
-          <Image src="/logo-transparent.png" alt="Saarthi" width={38} height={38} style={{ objectFit: 'contain' }} />
-          <div>
+          <Image src="/logo-transparent.png" alt="Saarthi" width={38} height={38} style={{ objectFit: 'contain', flexShrink: 0 }} />
+          <span className="txt">
             <div className="admin-logo-text">Saar<span>thi</span></div>
             <div className="admin-logo-sub">Command Center</div>
-          </div>
+          </span>
         </Link>
         <nav className="admin-nav">
           {links.map((l) => {
@@ -60,17 +62,21 @@ export default function AdminShell({ user, children }: { user: SessionUser; chil
               </Link>
             )
           })}
-          <div className="nav-section">Site</div>
+          <div className="nav-section txt">Site</div>
           <Link href="/" target="_blank">
             <Icon d={ICONS.site} />
             <span className="txt">View website ↗</span>
           </Link>
+          <button className="sidebar-toggle" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Expand menu' : 'Collapse menu'}>
+            <span style={{ fontSize: 15 }}>{collapsed ? '›' : '‹'}</span>
+            <span className="txt" style={{ marginLeft: 10, fontSize: 13 }}>Collapse</span>
+          </button>
         </nav>
         <div className="admin-user">
-          <div>
+          <span className="txt">
             <div className="admin-user-name">{user.name}</div>
             <div className="admin-user-role">{user.role.toLowerCase()}</div>
-          </div>
+          </span>
           <button className="btn btn-quiet btn-sm" onClick={logout} title="Log out">⎋</button>
         </div>
       </aside>
