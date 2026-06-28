@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAgentKey } from '@/lib/agent-auth'
+import { describeRequirements, initiateLeadConversation } from '@/lib/qualifier'
+import { formatReferredLeadOpener } from '@/lib/whatsapp'
+import { safeJsonParse } from '@/lib/format'
+import type { LeadRequirements } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +48,7 @@ export async function POST(req: Request) {
 
   const existing = await db.lead.findUnique({
     where: { phone },
-    select: { id: true, requirements: true, name: true },
+    select: { id: true, requirements: true, name: true, conversationStarted: true },
   })
 
   const isNew = !existing
@@ -87,5 +91,20 @@ export async function POST(req: Request) {
     },
   })
 
-  return NextResponse.json({ leadId: lead.id, phone: lead.phone, isNew })
+  // Kick off the bot follow-up the first time we hear about this lead, using the
+  // requirement the broker shared so the lead doesn't have to repeat themselves.
+  // `opener` is returned so the caller (cx-agent) delivers it over WhatsApp.
+  let opener: string | null = null
+  if (isNew || !existing?.conversationStarted) {
+    const req = safeJsonParse<LeadRequirements>(lead.requirements, {})
+    const requirementText = Object.keys(req).length ? describeRequirements(req) : null
+    const contextualOpener = formatReferredLeadOpener({
+      leadName: lead.name,
+      requirementText,
+      brokerName: body.referredByName ?? null,
+    })
+    opener = await initiateLeadConversation(lead.id, false, contextualOpener)
+  }
+
+  return NextResponse.json({ leadId: lead.id, phone: lead.phone, isNew, opener })
 }

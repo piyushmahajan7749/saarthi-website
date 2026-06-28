@@ -48,18 +48,18 @@ export function propertyUrl(propertyId: string): string {
 // WhatsApp-formatted matches message with links to the website detail pages.
 export function formatMatchesMessage(matches: { property: Property; reasons: string[] }[], leadName?: string | null): string {
   const hello = leadName ? `${leadName}, ` : ''
-  const lines: string[] = [`${hello}yeh rahi aapke liye ${matches.length} best matching properties: ✨`]
+  const lines: string[] = [`${hello}yeh rahi aapke liye ${matches.length} achhi properties 👇`]
   matches.forEach((m, i) => {
     const p = m.property
     const specs = [p.bhk ? `${p.bhk} BHK` : null, formatArea(p.area, p.areaUnit) || null, p.locality || p.city].filter(Boolean).join(' · ')
     lines.push('')
-    lines.push(`*${i + 1}. ${p.title}*`)
-    lines.push(`   ${formatPrice(p.price, p.listingFor)} · ${specs}`)
-    if (m.reasons.length) lines.push(`   ✓ ${m.reasons.slice(0, 2).join(' · ')}`)
-    lines.push(`   ${propertyUrl(p.id)}`)
+    lines.push(`${i + 1}. ${p.title}`)
+    lines.push(`${formatPrice(p.price, p.listingFor)} · ${specs}`)
+    if (m.reasons.length) lines.push(`✓ ${m.reasons.slice(0, 2).join(' · ')}`)
+    lines.push(propertyUrl(p.id))
   })
   lines.push('')
-  lines.push('Pura detail website par hai. Koi pasand aaye toh bataiye — main visit schedule karwa dunga! 🏡')
+  lines.push('Koi pasand aaye toh bataiye — main visit set karwa dunga 🏡')
   return lines.join('\n')
 }
 
@@ -96,14 +96,14 @@ export function formatVisitProposal(args: {
 }): string {
   const { leadName, slotText, properties } = args
   const hello = leadName ? `${leadName}, ` : ''
-  const list = properties.map((p, i) => `   ${i + 1}. ${p.title}`).join('\n')
+  const list = properties.map((p, i) => `${i + 1}. ${p.title}`).join('\n')
   return [
-    `${hello}maine aapke liye visit tentatively schedule kar diya hai: 📅`,
+    `${hello}maine aapke liye visit tentatively rakh diya hai 📅`,
     '',
-    `🕒 *${slotText}*`,
+    `🕒 ${slotText}`,
     properties.length ? `\nProperties:\n${list}` : '',
     '',
-    'Humari team property owner/broker se final time confirm karke aapko bata degi. Aapko koi aur time chahiye toh bata dijiye! 🙏',
+    'Humari team broker se final time confirm karke aapko bata degi. Koi aur time chahiye toh bata dijiye 🙏',
   ].filter((l) => l !== '').join('\n')
 }
 
@@ -121,16 +121,16 @@ export function formatVisitCoordinationAlert(args: {
     .map((p, i) => `${i + 1}. ${p.title}${p.postedBy ? ` — broker: ${p.postedBy}` : ''}\n   ${propertyUrl(p.id)}`)
     .join('\n')
   return [
-    '📅 *Visit to coordinate — your lead is ready!*',
+    '📅 Visit to coordinate — your lead is ready',
     '',
-    `*Lead:* ${leadName || 'Name not shared'} (+${leadPhone.replace(/\D/g, '')})`,
-    `*Summary:* ${summary}`,
-    `*Tentative slot:* ${slotText}`,
+    `Lead: ${leadName || 'Name not shared'} (+${leadPhone.replace(/\D/g, '')})`,
+    `Summary: ${summary}`,
+    `Tentative slot: ${slotText}`,
     '',
-    '*Selected properties:*',
+    'Selected properties:',
     list,
     '',
-    'Please coordinate the final time with the listing broker(s) and confirm with the lead.',
+    'Please confirm the final time with the listing broker(s) and the lead.',
     `Manage: ${siteUrl()}/admin/leads`,
   ].join('\n')
 }
@@ -138,12 +138,29 @@ export function formatVisitCoordinationAlert(args: {
 // Outbound opener when staff add a lead — bot starts qualification.
 export function formatLeadOpener(leadName: string | null): string {
   const hello = leadName ? `Namaste ${leadName}! 🙏` : 'Namaste! 🙏'
-  return `${hello} Main *Saarthi* hoon, ${process.env.NEXT_PUBLIC_SITE_NAME || 'aapki property search'} ka AI assistant. Aapki property requirement samajhne ke liye 2 minute chahiye. Aap *buy* karna chahte hain ya *rent* par dhoondh rahe hain? 🏡`
+  return `${hello} Main Saarthi hoon, ${process.env.NEXT_PUBLIC_SITE_NAME || 'aapki property search'} ka AI assistant. Aapke liye ghar dhoondhne mein madad karunga. Aap khareedna chahte hain ya rent par dhoondh rahe hain? 🏡`
+}
+
+// Opener when a BROKER refers a lead — the bot reaches out and confirms the
+// requirement the broker shared, so the lead doesn't have to repeat themselves.
+export function formatReferredLeadOpener(args: {
+  leadName: string | null
+  requirementText: string | null
+  brokerName: string | null
+}): string {
+  const { leadName, requirementText, brokerName } = args
+  const hello = leadName ? `Namaste ${leadName}! 🙏` : 'Namaste! 🙏'
+  const via = brokerName ? `${brokerName} ne aapko humse connect kiya hai.` : 'Aapko humse connect kiya gaya hai.'
+  const known =
+    requirementText && requirementText !== 'requirements not captured yet'
+      ? ` Maine suna aap ${requirementText} dhoondh rahe hain — sahi hai na?`
+      : ' Bataiye, aap kaisi property dhoondh rahe hain?'
+  return `${hello} Main Saarthi hoon, ${process.env.NEXT_PUBLIC_SITE_NAME || 'aapki property search'} ka AI assistant. ${via}${known} Main aapke liye sahi options nikaal deta hoon 🏡`
 }
 
 export function formatVisitReminder(args: { leadName: string | null; slotText: string }): string {
   const hello = args.leadName ? `${args.leadName}, ` : ''
-  return `${hello}reminder 🔔 — aapki property visit *${args.slotText}* ke liye tentatively scheduled hai. Humari team confirm karke aapko final details bhejegi. Visit ke liye ready hain? 😊`
+  return `${hello}reminder 🔔 — aapki property visit ${args.slotText} ke liye tentatively scheduled hai. Humari team confirm karke final details bhejegi. Visit ke liye ready hain? 😊`
 }
 
 export function formatFollowupMessage(leadName: string | null): string {
@@ -166,12 +183,12 @@ export function formatWarmLeadAlert(args: {
 }): string {
   const { leadName, leadPhone, summary, requirements, topProperty } = args
   return [
-    '🔥 *Warm lead — call them now!*',
+    '🔥 Warm lead — call them now',
     '',
-    `*Who:* ${leadName || 'Name not shared yet'} (+${leadPhone.replace(/\D/g, '')})`,
-    `*Summary:* ${summary}`,
-    `*Looking for:* ${requirements}`,
-    topProperty ? `*Most interested in:* ${topProperty.title}\n${propertyUrl(topProperty.id)}` : null,
+    `Who: ${leadName || 'Name not shared yet'} (+${leadPhone.replace(/\D/g, '')})`,
+    `Summary: ${summary}`,
+    `Looking for: ${requirements}`,
+    topProperty ? `Most interested in: ${topProperty.title}\n${propertyUrl(topProperty.id)}` : null,
     '',
     `Full history: ${siteUrl()}/admin/leads`,
   ]

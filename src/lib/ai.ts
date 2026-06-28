@@ -20,12 +20,19 @@ function client(): Anthropic {
   return _client
 }
 
+// The conversational AI layer runs on Azure OpenAI (GPT-5.5) when configured,
+// otherwise Anthropic Claude, otherwise the heuristic engine.
 export function aiEnabled(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return azureEnabled() || Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
 // Structured-output helper: one user prompt -> JSON matching `schema`.
+// Prefers Azure (reasoning models need headroom, so we floor the token budget),
+// falls back to Anthropic structured outputs.
 async function structured<T>(system: string, prompt: string, schema: Record<string, unknown>, maxTokens = 16000): Promise<T> {
+  if (azureEnabled()) {
+    return azureChatJSON<T>({ system, user: prompt, schema, maxTokens: Math.max(maxTokens, 6000) })
+  }
   const response = await client().messages.create({
     model: MODEL,
     max_tokens: maxTokens,
@@ -428,7 +435,9 @@ Stages — move through them naturally, ONE question per message, under 60 words
    - Then propose ONE concrete tentative slot: proposedSlotISO + proposedSlotText. CRITICAL: the slot must be TOMORROW OR LATER — never today (the broker may not be free same-day). Use the TODAY date given to you to compute this. Frame it as tentative: "main aapke liye <slot> tentatively rakh raha hoon, broker confirm karke final karega."
    - Tell them our team will confirm the final time with the property owner/broker.
 4. Never discuss commission/legal/price negotiation — say the broker will help.
-Always merge new info into the FULL requirements object (carry previous values unless corrected). Only set proposedSlotISO once you actually have their availability.`
+Always merge new info into the FULL requirements object (carry previous values unless corrected). Only set proposedSlotISO once you actually have their availability.
+
+TONE & FORMATTING: Write like a warm, real human texting on WhatsApp. Plain sentences only. NEVER use markdown, asterisks (*), underscores, bold, italics, bullet characters, numbered headings, or emoji-spam. At most one friendly emoji per message. Keep it short, natural and easy to read.`
 
 export async function qualifierTurn(args: {
   history: { direction: string; content: string }[]

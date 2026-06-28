@@ -94,12 +94,14 @@ export async function createLeadFromExtraction(args: {
 }
 
 // Outbound: bot introduces itself and starts gathering requirements.
-export async function initiateLeadConversation(leadId: string, deliver = true): Promise<string | null> {
+// `openerOverride` lets callers (e.g. broker referrals) supply a contextual
+// first message instead of the generic opener.
+export async function initiateLeadConversation(leadId: string, deliver = true, openerOverride?: string): Promise<string | null> {
   const lead = await db.lead.findUnique({ where: { id: leadId } })
   if (!lead) return null
   if (lead.phone.startsWith('manual:') || lead.phone.startsWith('web:')) return null
 
-  const opener = formatLeadOpener(lead.name)
+  const opener = openerOverride ?? formatLeadOpener(lead.name)
   await db.message.create({ data: { leadId: lead.id, direction: 'OUTBOUND', channel: 'WHATSAPP', content: opener } })
   await db.lead.update({
     where: { id: lead.id },
