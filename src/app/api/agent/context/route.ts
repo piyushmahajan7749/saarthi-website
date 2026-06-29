@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { requireAgentKey } from '@/lib/agent-auth'
 import { propertyUrl } from '@/lib/whatsapp'
 import { todayContextIST } from '@/lib/scheduling'
-import { formatPrice, safeJsonParse } from '@/lib/format'
+import { formatPrice, formatArea, safeJsonParse } from '@/lib/format'
 import type { LeadRequirements } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -83,9 +83,11 @@ export async function POST(req: Request) {
       id: m.propertyId,
       title: m.property.title,
       priceLabel: formatPrice(m.property.price, m.property.listingFor),
+      bhk: m.property.bhk,
+      area: m.property.area != null ? formatArea(m.property.area, m.property.areaUnit) : null,
       locality: m.property.locality,
       url: propertyUrl(m.propertyId),
-      imageUrl: safeJsonParse<string[]>(m.property.images, [])[0] ?? null,
+      imageUrls: safeJsonParse<string[]>(m.property.images, []).slice(0, 5),
       videoUrl: safeJsonParse<string[]>(m.property.videos, [])[0] ?? null,
       sentAt: m.sentAt.toISOString(),
     })),

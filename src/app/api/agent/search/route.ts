@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       type: m.property.type,
       listingFor: m.property.listingFor,
       url: propertyUrl(m.property.id),
-      imageUrl: safeJsonParse<string[]>(m.property.images, [])[0] ?? null,
+      imageUrls: safeJsonParse<string[]>(m.property.images, []).slice(0, 5),
       videoUrl: safeJsonParse<string[]>(m.property.videos, [])[0] ?? null,
       reasons: m.reasons,
       score: m.score,
