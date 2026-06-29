@@ -44,6 +44,15 @@ export async function POST(req: Request) {
   const parsed = listings[0]
   const photoUrls = body.photoUrls ?? []
 
+  // Credit the broker who posted it. Match a registered broker User by phone;
+  // otherwise record their name or number so "posted by" is never blank.
+  const senderPhone = (body.senderPhone ?? '').replace(/\D/g, '')
+  const brokerUser = senderPhone
+    ? await db.user.findUnique({ where: { phone: senderPhone } }).catch(() => null)
+    : null
+  const postedByName =
+    brokerUser?.name ?? (body.senderName?.trim() || (senderPhone ? `+${senderPhone}` : null))
+
   try {
     const property = await db.property.create({
       data: {
@@ -62,9 +71,10 @@ export async function POST(req: Request) {
         amenities: JSON.stringify(Array.isArray(parsed.amenities) ? parsed.amenities : []),
         images: JSON.stringify(photoUrls),
         videos: JSON.stringify([]),
-        ownerName: parsed.ownerName ?? body.senderName ?? null,
+        ownerName: parsed.ownerName ?? null,
         ownerPhone: parsed.ownerPhone ? String(parsed.ownerPhone).replace(/\D/g, '') || null : null,
-        postedByName: body.senderName ?? null,
+        postedById: brokerUser?.id ?? null,
+        postedByName,
         rawText: text,
         aiSummary: parsed.aiSummary ?? null,
         aiNotes: parsed.aiNotes ?? null,
