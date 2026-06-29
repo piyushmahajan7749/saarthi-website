@@ -49,6 +49,12 @@ nav{
   white-space:nowrap;
 }
 .nav-cta:hover{background:var(--o2);transform:translateY(-1px)}
+.nav-burger{display:none;position:relative;z-index:2;background:none;border:none;color:var(--cream);cursor:pointer;padding:6px;margin:-6px;line-height:0}
+.nav-mobile{position:fixed;inset:0;z-index:1;background:rgba(8,5,3,0.55);backdrop-filter:blur(3px)}
+.nav-mobile-panel{position:absolute;top:78px;left:1rem;right:1rem;background:#17110b;border:1px solid rgba(200,96,26,0.22);border-radius:18px;padding:0.6rem;display:flex;flex-direction:column;gap:2px;box-shadow:0 28px 80px rgba(0,0,0,0.65)}
+.nav-mobile-panel a{display:block;padding:0.9rem 1rem;border-radius:12px;color:var(--cream);text-decoration:none;font-size:15.5px}
+.nav-mobile-panel a:hover,.nav-mobile-panel a.active{background:rgba(200,96,26,0.12);color:var(--o3)}
+.nav-mobile-panel .nav-cta{color:#fff;font-size:14.5px}
 
 /* HERO */
 .hero{
@@ -571,8 +577,12 @@ footer{
 
 /* RESPONSIVE */
 @media(max-width:900px){
-  nav{padding:1rem 1.5rem}
+  nav{padding:1rem 1.25rem}
   .nav-links{display:none}
+  .nav-cta-desktop{display:none}
+  .nav-burger{display:inline-flex}
+  .nav-logo img{width:44px;height:44px}
+  .nav-logo-text{font-size:19px}
   .what-grid,.brokers-grid{grid-template-columns:1fr;gap:3rem}
   .problem-grid,.features-grid,.testimonials-grid{grid-template-columns:1fr}
   .cities-grid{grid-template-columns:repeat(2,1fr)}

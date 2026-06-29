@@ -8,6 +8,12 @@
       "port": 3000
     },
     {
+      "name": "saarthi-mobile",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "autoPort": true
+    },
+    {
       "name": "saarthi-prod",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],

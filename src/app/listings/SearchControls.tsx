@@ -43,7 +43,7 @@ export default function SearchControls() {
         <button type="submit" className="btn btn-solid">Search 🔍</button>
       </form>
 
-      <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+      <div className="row search-filters" style={{ flexWrap: 'wrap', gap: 10 }}>
         <select className="select" style={{ width: 'auto' }} value={sp.get('for') ?? ''} onChange={(e) => setParam('for', e.target.value)}>
           <option value="">Buy or rent</option>
           <option value="SALE">For sale</option>

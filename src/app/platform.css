@@ -221,8 +221,14 @@
 }
 @media (max-width: 760px) {
   .wrap { padding: 0 1.25rem; }
+  .page { padding-top: 88px; }
   .listings-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  /* Smart-search bar: let the input grow, keep the button beside it */
+  .search-shell { flex-wrap: wrap; }
+  .search-shell .input { flex: 1 1 140px; min-width: 0; }
+  /* Filter row: even, tappable controls — two per row, no auto-margins */
+  .search-filters > .select, .search-filters > .input { flex: 1 1 45% !important; width: auto !important; min-width: 0 !important; margin-left: 0 !important; }
   .admin-sidebar { width: 64px; }
   .admin-sidebar .admin-logo-text, .admin-sidebar .admin-logo-sub, .admin-nav a span.txt, .admin-nav .nav-section, .admin-user { display: none; }
   .admin-nav a { justify-content: center; padding: 0.7rem 0; }
