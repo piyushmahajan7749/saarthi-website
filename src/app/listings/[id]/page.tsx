@@ -90,7 +90,7 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
           )}
 
           {/* header + 2-col body */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem', marginTop: '1.8rem', alignItems: 'start' }} className="detail-grid">
+          <div className="detail-grid" style={{ marginTop: '1.8rem' }}>
             <div style={{ minWidth: 0 }}>
               <div className="prop-price" style={{ fontSize: 38 }}>{formatPrice(property.price, property.listingFor)}</div>
               <h1 className="page-title" style={{ fontSize: 'clamp(26px,3.5vw,40px)', margin: '0.3rem 0' }}>{property.title}</h1>
@@ -140,7 +140,7 @@ export default async function ListingDetailPage({ params }: { params: { id: stri
             </div>
 
             {/* CTA card */}
-            <div className="card" style={{ position: 'sticky', top: 100 }}>
+            <div className="card detail-cta" style={{ position: 'sticky', top: 100 }}>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: 'var(--cream)', marginBottom: 4 }}>
                 Interested in this property?
               </div>

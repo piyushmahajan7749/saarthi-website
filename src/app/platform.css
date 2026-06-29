@@ -197,6 +197,9 @@
 .gallery-side { display: grid; grid-template-rows: 1fr 1fr; gap: 10px; }
 .gallery .ph, .gallery img { width: 100%; height: 100%; object-fit: cover; display: flex; align-items: center; justify-content: center; }
 
+/* ---------- listing detail ---------- */
+.detail-grid { display: grid; grid-template-columns: 1fr 360px; gap: 2rem; align-items: start; }
+
 /* ---------- media carousel ---------- */
 .carousel { display: flex; flex-direction: column; gap: 10px; }
 .carousel-stage { position: relative; aspect-ratio: 16/10; max-height: 460px; border-radius: 20px; overflow: hidden; background: #0c0a09; }
@@ -229,6 +232,9 @@
   .search-shell .input { flex: 1 1 140px; min-width: 0; }
   /* Filter row: even, tappable controls — two per row, no auto-margins */
   .search-filters > .select, .search-filters > .input { flex: 1 1 45% !important; width: auto !important; min-width: 0 !important; margin-left: 0 !important; }
+  /* Listing detail: stack the body + CTA into one column, CTA not sticky */
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-cta { position: static !important; }
   .admin-sidebar { width: 64px; }
   .admin-sidebar .admin-logo-text, .admin-sidebar .admin-logo-sub, .admin-nav a span.txt, .admin-nav .nav-section, .admin-user { display: none; }
   .admin-nav a { justify-content: center; padding: 0.7rem 0; }
