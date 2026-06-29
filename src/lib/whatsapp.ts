@@ -114,6 +114,32 @@ export function formatVisitProposal(args: {
   ].filter((l) => l !== '').join('\n')
 }
 
+// Sent to the BUYER when a coordinator confirms (or reschedules) their visit
+// in the CRM — turns the earlier "tentative" into a firm time.
+export function formatVisitConfirmed(args: {
+  leadName: string | null
+  slotText: string
+  properties: { title: string }[]
+  rescheduled?: boolean
+}): string {
+  const { leadName, slotText, properties, rescheduled } = args
+  const hello = leadName ? `${leadName}, ` : ''
+  const list = properties.map((p) => `• ${p.title}`).join('\n')
+  const opener = rescheduled
+    ? `${hello}aapki property visit ka naya time set ho gaya hai 📅`
+    : `${hello}good news! Aapki property visit confirm ho gayi hai ✅`
+  return [
+    opener,
+    '',
+    `🕒 ${slotText}`,
+    properties.length ? `\n${list}` : '',
+    '',
+    'Humari team aapke saath rahegi. Koi badlav ho ya address chahiye toh bata dijiye 🙏',
+  ]
+    .filter((l) => l !== '')
+    .join('\n')
+}
+
 // Coordination alert to the staff member who added the lead (the coordinator) —
 // they take it forward with the listing brokers directly.
 export function formatVisitCoordinationAlert(args: {

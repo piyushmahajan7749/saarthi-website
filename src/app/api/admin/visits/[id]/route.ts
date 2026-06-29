@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { VISIT_STATUSES } from '@/types'
+import { sendWhatsAppText, formatVisitConfirmed } from '@/lib/whatsapp'
+import { formatSlotIST } from '@/lib/scheduling'
+import { safeJsonParse } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +34,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   try {
     const updated = await db.visit.update({ where: { id: visit.id }, data })
+
+    const confirmedNow = data.status === 'CONFIRMED' && visit.status !== 'CONFIRMED'
+    const newTime = data.scheduledFor instanceof Date ? data.scheduledFor : null
+    const rescheduled = Boolean(newTime && visit.scheduledFor && newTime.getTime() !== visit.scheduledFor.getTime())
+
     if (data.status && data.status !== visit.status) {
       const type = data.status === 'CONFIRMED' ? 'VISIT_CONFIRMED' : data.status === 'COMPLETED' ? 'FEEDBACK' : 'STATUS_CHANGE'
       await db.activity.create({
@@ -42,6 +50,39 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (typeof body.feedback === 'string' && body.feedback.trim()) {
       await db.activity.create({ data: { type: 'FEEDBACK', description: `Visit feedback: ${body.feedback.trim()}`, leadId: visit.leadId, userId: session?.id ?? null } })
     }
+
+    // Tell the BUYER once the coordinator confirms or reschedules — turns the
+    // earlier "tentative" into a firm time. Non-fatal; only for real WA leads.
+    if ((confirmedNow || rescheduled) && updated.scheduledFor) {
+      try {
+        const lead = await db.lead.findUnique({ where: { id: visit.leadId } })
+        if (lead && /^\d{10,15}$/.test(lead.phone)) {
+          const propertyIds = safeJsonParse<string[]>(updated.propertyIds, [])
+          const props = propertyIds.length
+            ? await db.property.findMany({ where: { id: { in: propertyIds } }, select: { title: true } })
+            : []
+          const msg = formatVisitConfirmed({
+            leadName: lead.name,
+            slotText: formatSlotIST(updated.scheduledFor),
+            properties: props,
+            rescheduled: rescheduled && !confirmedNow,
+          })
+          await db.message.create({ data: { leadId: lead.id, direction: 'OUTBOUND', channel: 'WHATSAPP', content: msg } })
+          const delivered = await sendWhatsAppText(lead.phone, msg)
+          await db.activity.create({
+            data: {
+              type: 'NOTE',
+              description: delivered ? 'Visit confirmation sent to buyer on WhatsApp' : 'Visit confirmation logged (WhatsApp sender not configured)',
+              leadId: lead.id,
+              userId: session?.id ?? null,
+            },
+          })
+        }
+      } catch (notifyErr) {
+        console.error('[admin/visits] buyer notify failed (non-fatal):', notifyErr)
+      }
+    }
+
     return NextResponse.json({ visit: updated })
   } catch (err) {
     console.error('[admin/visits] patch failed:', err)
